@@ -19,6 +19,8 @@ today.
   distroless containers
 - Serves a built SPA from the same binary, with a history fallback that refuses to answer writes
 - Reads the configuration every Facile API shares, plus typed helpers for the rest
+- Turns a route registry into OpenAPI 3.1 behind a Scalar reference at `/docs`, and reports
+  routes the registry forgot
 
 ## Stack
 
@@ -108,6 +110,7 @@ health/       /health and /ready, mounted at the root and under /api
 healthcheck/  an argv hook so a distroless container can probe itself
 spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers
+apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
 docs/         architecture, configuration, development, API reference
 ```
 
