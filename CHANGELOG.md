@@ -6,6 +6,31 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-06
+
+### Added
+
+- `apiref` — the API reference every Go app was hand-rolling. It renders a route registry as
+  OpenAPI 3.1 and serves it behind Scalar at `/docs`, with the spec at `/docs/openapi.json`.
+
+  The registry types were **byte-identical across eight apps** (Agenda, Casier, Courrier,
+  GoSvelteBoilerplate, Nuage, Plume, Sablier, Vision) and the converter differed only in its
+  title string — which is how Agenda's spec came to be titled "Courrier API". Plume's was the
+  most complete implementation and is the one extracted.
+
+- `apiref.Undocumented` walks a live chi router and reports routes the registry does not
+  describe, so a hand-written inventory cannot silently drift from the code it documents.
+
+### Fixed
+
+- The widely-copied converter emitted `security: [{bearerAuth: []}]` without ever declaring
+  the scheme, and dropped path parameters and request bodies. `apiref` declares
+  `components.securitySchemes` and emits both.
+
+- The Scalar bundle is now pinned (`@scalar/api-reference@1.64.0`) rather than floating on
+  `latest`, so a Scalar release cannot change every suite app's reference page without a
+  commit. Override with `Config.ScriptURL` for air-gapped deployments.
+
 ## [0.8.0] — 2026-08-05
 
 Both gaps surfaced while migrating Jardin, the last Go app to adopt the chassis.

@@ -289,3 +289,67 @@ only the `strconv.ParseBool` spellings, so `yes` and `on` are errors. Callers ex
 error, by convention across the suite.
 
 Full variable reference and the adoption traps: [configuration.md](configuration.md).
+
+## `apiref`
+
+Serves a Facile API's reference documentation: an OpenAPI 3.1 document generated from a
+hand-written route registry, behind a Scalar UI. Every suite backend answers on the same
+path, so `/docs` means the same thing everywhere.
+
+```go
+apiref.Mount(router, apiref.Config{
+	Title:       "Sablier API",
+	Description: "Self-hosted time tracker for small teams.",
+	Servers:     []string{"/api"},
+	Registry:    docs.Registry,
+})
+```
+
+That registers `GET /docs` and `GET /docs/openapi.json`. Mount it on the **root** router,
+beside `/api` and before the SPA catch-all, so the reference sits at `/docs` rather than
+behind the API prefix. Mounting it on a subrouter works and the page's `data-url` follows —
+the spec URL is derived from the request path, not hardcoded.
+
+| Symbol | What it is |
+|---|---|
+| `Config` | `Title`, `Version`, `Description`, `Servers`, `Registry`, `ScriptURL` |
+| `Registry` / `Module` / `Route` / `Field` / `Error` | the route inventory types |
+| `Mount(chi.Router, Config)` | registers the page and the spec |
+| `OpenAPI(Config) map[string]any` | the document alone, for tests or static export |
+| `Undocumented(chi.Routes, Config, ...string) []string` | routes the registry forgot |
+| `ScalarScriptURL` | the pinned Scalar bundle |
+| `BasePath`, `SpecPath`, `DefaultVersion` | `/docs`, `/docs/openapi.json`, `1.0.0` |
+
+The generated document declares the `bearerAuth` security scheme it references, emits path
+parameters from `Route.PathParams`, and attaches request and response bodies where the
+registry names them. A `Route.Auth` of `""` documents a public route. A `ResponseBody` of
+`[]Thing` becomes an array schema.
+
+### Keeping the registry honest
+
+A hand-written inventory drifts the moment someone adds an endpoint and forgets it — the
+failure mode behind most stale documentation in this suite. `Undocumented` walks the live chi
+router and reports registered routes the registry does not describe, so the drift becomes a
+failing test rather than a lie:
+
+```go
+func TestEveryRouteIsDocumented(t *testing.T) {
+	if missing := apiref.Undocumented(buildRouter(), refConfig()); len(missing) > 0 {
+		t.Errorf("routes missing from the API registry: %v", missing)
+	}
+}
+```
+
+It ignores the reference page itself, `/health` and `/ready` at both mount points, and any
+wildcard route; pass extra prefixes to ignore more. Registry paths are matched both as
+written and joined onto each `Servers` entry, so an inventory of `/projects` matches a router
+serving `/api/projects`. Regex-constrained chi parameters (`{id:[0-9]+}`) are normalized to
+`{id}` before comparison.
+
+### The Scalar bundle is a remote script
+
+The reference page loads Scalar from a pinned jsDelivr build — pinned so a Scalar release
+cannot change every suite app's page without a commit. That is one remote request on a
+developer-facing page, but it does mean `/docs` renders blank on an air-gapped deployment.
+Set `Config.ScriptURL` to a locally served copy where that matters. Nothing else in tronc
+reaches the network.
