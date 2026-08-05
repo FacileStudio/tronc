@@ -50,11 +50,11 @@ func TestRecovererCoversTheLoggingMiddleware(t *testing.T) {
 func TestRequestIDReachesTheLog(t *testing.T) {
 	var buffer bytes.Buffer
 	router := NewRouter(Config{Logger: slog.New(slog.NewJSONHandler(&buffer, nil))})
-	router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
+	router.Get("/api/things", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/things", nil))
 
 	var record map[string]any
 	if err := json.Unmarshal(buffer.Bytes(), &record); err != nil {
