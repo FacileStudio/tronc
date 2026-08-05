@@ -89,6 +89,8 @@ Every failure crosses the wire as:
 | `failed_precondition` | 412 |
 | `resource_exhausted` | 413 |
 | `rate_limited` | 429 |
+| `method_not_allowed` | 405 |
+| `unavailable` | 503 |
 | `internal` | 500 |
 
 `httpjson.WriteError` turns anything that is not an `*errors.Error` into a generic
@@ -177,7 +179,7 @@ broken tool anywhere in a global config would otherwise take the gate down.
 Semver tags, never branch tracking:
 
 ```
-require github.com/FacileStudio/tronc v0.7.0
+require github.com/FacileStudio/tronc v0.8.0
 ```
 
 Breaking changes bump the minor while `v0`. See [CHANGELOG.md](CHANGELOG.md).
