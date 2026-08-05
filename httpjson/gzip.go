@@ -18,8 +18,13 @@ var errDecompressedTooLarge = stderrors.New("decompressed body too large")
 // small compressed body can expand without limit, so bounding only the request
 // is a decompression bomb.
 func DecodeGzipJSON(w http.ResponseWriter, request *http.Request, dst any, maxDecompressedBytes int64) error {
+	return DecodeGzipJSONLimit(w, request, dst, MaxBodyBytes, maxDecompressedBytes)
+}
+
+// DecodeGzipJSONLimit is DecodeGzipJSON with both caps given explicitly.
+func DecodeGzipJSONLimit(w http.ResponseWriter, request *http.Request, dst any, maxCompressedBytes, maxDecompressedBytes int64) error {
 	defer func() { _ = request.Body.Close() }()
-	request.Body = http.MaxBytesReader(w, request.Body, MaxBodyBytes)
+	request.Body = http.MaxBytesReader(w, request.Body, maxCompressedBytes)
 
 	decompressed, err := gzip.NewReader(request.Body)
 	if err != nil {

@@ -6,6 +6,21 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-05
+
+### Added
+
+- `httpjson.DecodeJSONLimit` and `httpjson.DecodeGzipJSONLimit` — the decoders with the byte
+  caps given explicitly.
+
+  Found by comparing the nine copies being replaced: eight cap request bodies at 1 MB, but
+  **Journal caps at 8 MB with a 32 MB decompressed ceiling**, because its `/ingest` takes
+  batches of up to 1000 log entries. Adopting a hardcoded 1 MB would have silently started
+  rejecting real ingest traffic with a 413 — an outage in the service every other app ships
+  its logs to, and one that only shows up under load.
+
+  `DecodeJSON` and `DecodeGzipJSON` keep the 1 MB default, which is right for the other eight.
+
 ## [0.2.0] — 2026-08-05
 
 Driven by the rollout survey across the remaining nine Go APIs: two gaps that would each have
@@ -71,6 +86,7 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.3.0
 [0.2.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.1.0

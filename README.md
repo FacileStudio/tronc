@@ -176,7 +176,7 @@ broken tool anywhere in a global config would otherwise take the gate down.
 Semver tags, never branch tracking:
 
 ```
-require github.com/FacileStudio/tronc v0.2.0
+require github.com/FacileStudio/tronc v0.3.0
 ```
 
 Breaking changes bump the minor while `v0`. See [CHANGELOG.md](CHANGELOG.md).

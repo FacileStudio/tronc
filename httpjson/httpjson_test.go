@@ -159,3 +159,22 @@ func TestDecodeGzipJSONStopsADecompressionBomb(t *testing.T) {
 		t.Fatalf("a %d-byte body expanding past the cap was accepted: %v", bomb.Len(), err)
 	}
 }
+
+func TestDecodeJSONLimitHonoursAnExplicitCap(t *testing.T) {
+	body := fmt.Sprintf(`{"name":%q}`, strings.Repeat("x", 2<<20))
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	var into payload
+	if err := DecodeJSONLimit(recorder, request, &into, 8<<20); err != nil {
+		t.Fatalf("a 2MB body was refused under an 8MB cap: %v", err)
+	}
+
+	recorder = httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	err := DecodeJSONLimit(recorder, request, &into, 1<<20)
+	var appErr *errors.Error
+	if err == nil || !stderrors.As(err, &appErr) || appErr.Code != "resource_exhausted" {
+		t.Fatalf("a 2MB body was accepted under a 1MB cap: %v", err)
+	}
+}
