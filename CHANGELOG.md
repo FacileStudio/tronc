@@ -6,6 +6,26 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-05
+
+Driven by the rollout survey across the remaining nine Go APIs: two gaps that would each have
+broken a deploy.
+
+### Added
+
+- `httpjson.DecodeGzipJSON` — a gzip-compressed JSON body with two independent caps, the
+  compressed body at `MaxBodyBytes` and the decompressed stream at the caller's limit. Bounding
+  only the request is a decompression bomb. Journal's ingest needs this; it was the one function
+  in the suite's nine `httpjson` copies that tronc did not cover.
+- `errors.TooLarge` is now also returned when the decompressed cap is exceeded.
+
+### Fixed
+
+- `env.CORSOriginKeys` gained **`DOMAINS`** and **`DOMAIN`**. Five of the nine remaining apps
+  read one of those two names — Agenda, Courrier and Sablier use `DOMAINS`, Plume and Vision use
+  the singular `DOMAIN` — so without them adoption would have silently emptied the allowed-origin
+  list and denied every cross-origin caller. Seven names are now read, in order.
+
 ## [0.1.0] — 2026-08-05
 
 First release. Extracted from the twelve Go APIs in the Facile suite, reconciling the
@@ -51,5 +71,6 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.1.0

@@ -62,7 +62,7 @@ func main() {
 | Package | What it is |
 |---|---|
 | `errors` | the error envelope: a code, a message, a wrapped cause, and one code→status map |
-| `httpjson` | `DecodeJSON` (1 MB cap, unknown fields rejected, single object enforced), `WriteJSON`, `WriteError` |
+| `httpjson` | `DecodeJSON` (1 MB cap, unknown fields rejected, single object enforced), `DecodeGzipJSON` (bomb-safe), `WriteJSON`, `WriteError` |
 | `logger` | slog JSON on stdout, level from config, and a `Wrap` seam for log shipping |
 | `middleware` | `RequestLogger`, `CORS`, `Recoverer` |
 | `httpx` | `NewRouter` — the standard chi chain, assembled once |
@@ -130,9 +130,9 @@ These are not refactors. Each one is a live defect in the copies being replaced.
 | `CORS_ALLOWED_ORIGINS` | *(none — deny)* | comma-separated |
 | `JOURNAL_URL`, `JOURNAL_TOKEN` | *(none)* | read here, wired by the app |
 
-`CORS_ALLOWED_ORIGINS` falls back to `ALLOWED_ORIGINS`, `CORS_ORIGINS`, `TRUSTED_ORIGINS`
-and `CLIENT_ORIGIN`, in that order — the four names that drifted out of the boilerplate. A
-repo can adopt `tronc` without its deployment config changing in the same breath.
+`CORS_ALLOWED_ORIGINS` falls back to `ALLOWED_ORIGINS`, `DOMAINS`, `DOMAIN`, `CORS_ORIGINS`,
+`TRUSTED_ORIGINS` and `CLIENT_ORIGIN`, in that order — the six names that drifted out of the
+boilerplate. A repo can adopt `tronc` without its deployment config changing in the same breath.
 
 ## Why Journal is not in here
 
@@ -176,7 +176,7 @@ broken tool anywhere in a global config would otherwise take the gate down.
 Semver tags, never branch tracking:
 
 ```
-require github.com/FacileStudio/tronc v0.1.0
+require github.com/FacileStudio/tronc v0.2.0
 ```
 
 Breaking changes bump the minor while `v0`. See [CHANGELOG.md](CHANGELOG.md).
