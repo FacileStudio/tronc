@@ -61,10 +61,13 @@ fi
 "$GO" test ./... || status=1
 
 if [ "$mode" = "all" ]; then
-  if command -v golangci-lint >/dev/null 2>&1; then
+  # `command -v` is not enough: a mise shim for an uninstalled version is on
+  # PATH and resolves, but every invocation of it fails. Probe that the binary
+  # actually runs, so an unusable tool skips the pass instead of failing it.
+  if golangci-lint version >/dev/null 2>&1; then
     golangci-lint run ./... || status=1
   else
-    echo "check: no 'golangci-lint' on PATH, skipping the lint pass" >&2
+    echo "check: no usable 'golangci-lint', skipping the lint pass (CI still runs it)" >&2
   fi
 fi
 
