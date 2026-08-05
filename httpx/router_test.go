@@ -105,3 +105,44 @@ func TestCORSIsAppliedWhenConfigured(t *testing.T) {
 		t.Errorf("allow-origin = %q", got)
 	}
 }
+
+func TestChainAppliesTheSameStackToAPlainMux(t *testing.T) {
+	var buffer bytes.Buffer
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/things", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("GET /api/boom", func(_ http.ResponseWriter, _ *http.Request) {
+		panic("mux handler exploded")
+	})
+
+	handler := Chain(Config{Logger: slog.New(slog.NewJSONHandler(&buffer, nil))}, mux)
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/things", nil))
+
+	var record map[string]any
+	if err := json.Unmarshal(buffer.Bytes(), &record); err != nil {
+		t.Fatalf("log line is not JSON: %v (%s)", err, buffer.String())
+	}
+	if record["request_id"] == "" || record["request_id"] == nil {
+		t.Error("request_id was empty through Chain")
+	}
+	if record["kind"] != "api" {
+		t.Errorf("kind = %v, want api", record["kind"])
+	}
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/boom", nil))
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("panic through Chain = %d, want 500", recorder.Code)
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil || body.Error.Code != "internal" {
+		t.Errorf("panic response was not the envelope: %s", recorder.Body.String())
+	}
+}

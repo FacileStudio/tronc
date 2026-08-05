@@ -6,6 +6,18 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-05
+
+### Added
+
+- `httpx.Chain` — the standard middleware stack applied to any `http.Handler`, in the same order
+  `NewRouter` uses.
+
+  `NewRouter` returns a `*chi.Mux`, which shut out the one Go app in the suite that does not use
+  chi: Mycelium routes with Go 1.22's `http.ServeMux` and pattern matching. Rewriting it onto chi
+  to gain request logging, panic recovery and CORS would have been a large change for no benefit
+  of its own. `Chain` gives it the same behaviour and leaves its router alone.
+
 ## [0.6.0] — 2026-08-05
 
 ### Fixed
@@ -137,7 +149,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.7.0
 [0.6.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.6.0
 [0.5.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.5.0
 [0.4.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.4.0
