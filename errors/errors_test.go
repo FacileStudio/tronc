@@ -20,6 +20,8 @@ func TestStatusCoversEveryConstructor(t *testing.T) {
 		"failed_precondition": {Failed("x"), http.StatusPreconditionFailed},
 		"resource_exhausted":  {TooLarge("x"), http.StatusRequestEntityTooLarge},
 		"rate_limited":        {RateLimited("x"), http.StatusTooManyRequests},
+		"method_not_allowed":  {NotAllowed("x"), http.StatusMethodNotAllowed},
+		"unavailable":         {Unavailable("x"), http.StatusServiceUnavailable},
 		"internal":            {Internal("x", nil), http.StatusInternalServerError},
 	}
 

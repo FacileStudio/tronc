@@ -6,6 +6,24 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-05
+
+Both gaps surfaced while migrating Mycelium, the last Go app to adopt the chassis.
+
+### Added
+
+- `errors.NotAllowed` (`method_not_allowed` → 405) and `errors.Unavailable` (`unavailable` → 503).
+  Without them `WriteError` collapsed both onto 500, so an app converting its handlers would have
+  turned "this identity provider is down, retry" into "something broke, give up" — a real
+  regression on the SSO-unavailable path.
+- `env.LoadCoreWithout` — `LoadCore` for a service with no database of its own. `DATABASE_URL`
+  is read if present and not required.
+
+  `LoadCore` requiring it excluded two apps from the shared configuration: Mycelium, which keeps
+  its state as files, and Agenda, which builds its DSN from `DB_USER`/`DB_PASSWORD`. Both had to
+  hand-populate `Core` field by field, which is exactly the duplication this package exists to
+  remove.
+
 ## [0.7.0] — 2026-08-05
 
 ### Added
@@ -149,7 +167,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.8.0
 [0.7.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.7.0
 [0.6.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.6.0
 [0.5.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.5.0
