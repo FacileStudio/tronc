@@ -6,6 +6,22 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-05
+
+### Fixed
+
+- `spa.Handler` answers **405** to anything that is not GET or HEAD, instead of falling back to
+  the index document.
+
+  Found while migrating Journal. Its collector posts to an internal URL; once the API moved
+  behind `/api`, that POST fell through to the SPA catch-all and received **200 with an HTML
+  body**. The shipper treats any 2xx as delivery, so it discarded every batch — the whole
+  suite's log collection failing silently, with nothing in any log to show for it.
+
+  A static build serves reads. Answering a write with the index document turns a routing
+  mistake into silent data loss, and this is the shape of bug that survives a deploy check
+  because every probe is a GET.
+
 ## [0.5.0] — 2026-08-05
 
 Consequence of the mono-container shape: one binary now serves the API *and* the client's static
@@ -121,7 +137,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.6.0
 [0.5.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.5.0
 [0.4.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.4.0
 [0.3.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.3.0
