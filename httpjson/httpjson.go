@@ -19,8 +19,15 @@ const MaxBodyBytes int64 = 1 << 20
 // fields are rejected, the body is capped at MaxBodyBytes, and trailing data
 // is an error. The returned error is always an *errors.Error.
 func DecodeJSON(w http.ResponseWriter, request *http.Request, dst any) error {
+	return DecodeJSONLimit(w, request, dst, MaxBodyBytes)
+}
+
+// DecodeJSONLimit is DecodeJSON with an explicit cap, for the endpoints whose
+// payloads are legitimately larger than MaxBodyBytes — a log-ingest batch, for
+// instance. Prefer DecodeJSON everywhere else.
+func DecodeJSONLimit(w http.ResponseWriter, request *http.Request, dst any, maxBytes int64) error {
 	defer func() { _ = request.Body.Close() }()
-	request.Body = http.MaxBytesReader(w, request.Body, MaxBodyBytes)
+	request.Body = http.MaxBytesReader(w, request.Body, maxBytes)
 
 	return decodeStrict(request.Body, dst)
 }
