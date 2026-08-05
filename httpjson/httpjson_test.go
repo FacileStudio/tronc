@@ -1,6 +1,8 @@
 package httpjson
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
@@ -103,5 +105,57 @@ func TestWriteErrorHidesTheUnderlyingCause(t *testing.T) {
 
 	if strings.Contains(recorder.Body.String(), "password") {
 		t.Errorf("raw error text leaked to the client: %s", recorder.Body.String())
+	}
+}
+
+func gzipped(t *testing.T, body string) *bytes.Buffer {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := gzip.NewWriter(&buffer)
+	if _, err := writer.Write([]byte(body)); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return &buffer
+}
+
+func decodeGzip(t *testing.T, body *bytes.Buffer, maxDecompressed int64) error {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/", body)
+	var into payload
+	return DecodeGzipJSON(recorder, request, &into, maxDecompressed)
+}
+
+func TestDecodeGzipJSONAcceptsAValidBody(t *testing.T) {
+	if err := decodeGzip(t, gzipped(t, `{"name":"tronc"}`), 1<<20); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+}
+
+func TestDecodeGzipJSONRejectsPlainBody(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"tronc"}`))
+	var into payload
+	err := DecodeGzipJSON(recorder, request, &into, 1<<20)
+
+	var appErr *errors.Error
+	if err == nil || !stderrors.As(err, &appErr) || appErr.Code != "invalid_argument" {
+		t.Fatalf("uncompressed body was accepted or misclassified: %v", err)
+	}
+}
+
+func TestDecodeGzipJSONStopsADecompressionBomb(t *testing.T) {
+	bomb := gzipped(t, fmt.Sprintf(`{"name":%q}`, strings.Repeat("x", 4<<20)))
+	if bomb.Len() >= 1<<20 {
+		t.Fatalf("test bomb is not actually small: %d compressed bytes", bomb.Len())
+	}
+
+	err := decodeGzip(t, bomb, 1<<10)
+	var appErr *errors.Error
+	if err == nil || !stderrors.As(err, &appErr) || appErr.Code != "resource_exhausted" {
+		t.Fatalf("a %d-byte body expanding past the cap was accepted: %v", bomb.Len(), err)
 	}
 }

@@ -44,6 +44,8 @@ func TestLoadCoreRejectsANonNumericPort(t *testing.T) {
 func TestCORSOriginsPrefersTheCanonicalName(t *testing.T) {
 	t.Setenv("CORS_ALLOWED_ORIGINS", "https://a.example")
 	t.Setenv("ALLOWED_ORIGINS", "https://b.example")
+	t.Setenv("DOMAINS", "https://d.example")
+	t.Setenv("DOMAIN", "https://e.example")
 	t.Setenv("TRUSTED_ORIGINS", "https://c.example")
 
 	if got := CORSOrigins(); !slices.Equal(got, []string{"https://a.example"}) {

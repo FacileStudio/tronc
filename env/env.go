@@ -3,7 +3,7 @@
 //
 // It settles two naming splits the suite carries today. CORS origins are read
 // from CORS_ALLOWED_ORIGINS, the GoSvelteBoilerplate name, falling back to the
-// four names that drifted out of it so a repo can adopt tronc without its
+// six names that drifted out of it so a repo can adopt tronc without its
 // deployment config changing in the same breath. And APP_ENV is introduced:
 // no Go app had an environment-name variable at all.
 //
@@ -33,6 +33,8 @@ const (
 var CORSOriginKeys = []string{
 	"CORS_ALLOWED_ORIGINS",
 	"ALLOWED_ORIGINS",
+	"DOMAINS",
+	"DOMAIN",
 	"CORS_ORIGINS",
 	"TRUSTED_ORIGINS",
 	"CLIENT_ORIGIN",

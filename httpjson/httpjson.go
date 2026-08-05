@@ -22,7 +22,11 @@ func DecodeJSON(w http.ResponseWriter, request *http.Request, dst any) error {
 	defer func() { _ = request.Body.Close() }()
 	request.Body = http.MaxBytesReader(w, request.Body, MaxBodyBytes)
 
-	decoder := json.NewDecoder(request.Body)
+	return decodeStrict(request.Body, dst)
+}
+
+func decodeStrict(body io.Reader, dst any) error {
+	decoder := json.NewDecoder(body)
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(dst); err != nil {
@@ -38,6 +42,9 @@ func decodeError(err error, message string) error {
 	var maxBytesErr *http.MaxBytesError
 	if stderrors.As(err, &maxBytesErr) {
 		return errors.TooLarge("request body too large")
+	}
+	if stderrors.Is(err, errDecompressedTooLarge) {
+		return errors.TooLarge("decompressed body too large")
 	}
 	return errors.Invalid(message)
 }
