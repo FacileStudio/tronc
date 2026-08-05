@@ -6,6 +6,20 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-05
+
+### Added
+
+- `spa` — serves a built single-page application from a directory, so one Go binary can serve
+  both the API and the client it belongs to. Extracted from Courrier's `internal/spa`, which was
+  the only implementation in the suite, and hardened on the way:
+  - the history fallback **does not** apply to paths carrying a file extension. A missing bundle
+    now 404s instead of receiving `index.html` with a `text/html` content type, which surfaces
+    in the browser as an unrelated MIME or syntax error and hides the real failure.
+  - containment is delegated to `http.Dir`, so an encoded traversal cannot escape the directory.
+  - dotfiles are refused outright.
+  - hashed assets get `immutable` caching, the index document gets `no-cache`.
+
 ## [0.3.0] — 2026-08-05
 
 ### Added
@@ -86,7 +100,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.4.0
 [0.3.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.3.0
 [0.2.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.1.0

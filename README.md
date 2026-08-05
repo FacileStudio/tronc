@@ -68,6 +68,7 @@ func main() {
 | `httpx` | `NewRouter` — the standard chi chain, assembled once |
 | `health` | `/health` and `/ready`, mounted at both the root and `/api` |
 | `healthcheck` | a `healthcheck` argv hook so a distroless container can probe itself |
+| `spa` | serves a built SPA from a directory, with a history fallback that will not mask a missing bundle |
 | `env` | the shared configuration, plus typed `String`/`Int`/`Bool`/`Duration`/`List` helpers |
 
 ## The error envelope
@@ -176,7 +177,7 @@ broken tool anywhere in a global config would otherwise take the gate down.
 Semver tags, never branch tracking:
 
 ```
-require github.com/FacileStudio/tronc v0.3.0
+require github.com/FacileStudio/tronc v0.4.0
 ```
 
 Breaking changes bump the minor while `v0`. See [CHANGELOG.md](CHANGELOG.md).
