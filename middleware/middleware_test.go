@@ -51,7 +51,7 @@ func TestRequestLoggerRedactsAndRecordsStatus(t *testing.T) {
 		_, _ = w.Write([]byte("nope"))
 	}))
 
-	request := httptest.NewRequest(http.MethodGet, "/documents?token=leaked&page=1", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/documents?token=leaked&page=1", nil)
 	request.Header.Set("User-Agent", "tronc-test")
 	request.Header.Set("X-Forwarded-For", "203.0.113.7, 10.0.0.1")
 	handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -63,6 +63,9 @@ func TestRequestLoggerRedactsAndRecordsStatus(t *testing.T) {
 	var record map[string]any
 	if err := json.Unmarshal(buffer.Bytes(), &record); err != nil {
 		t.Fatalf("log line is not JSON: %v", err)
+	}
+	if record["kind"] != "api" {
+		t.Errorf("kind = %v, want api", record["kind"])
 	}
 	if record["status"] != float64(http.StatusTeapot) {
 		t.Errorf("status = %v, want 418", record["status"])
@@ -176,4 +179,82 @@ func TestRecovererRepanicsAbortHandler(t *testing.T) {
 		panic(http.ErrAbortHandler)
 	}))
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+}
+
+func TestClassify(t *testing.T) {
+	cases := map[string]Kind{
+		"/api/pastes":     KindAPI,
+		"/api":            KindAPI,
+		"/apiary":         KindStatic,
+		"/health":         KindHealth,
+		"/ready":          KindHealth,
+		"/api/health":     KindHealth,
+		"/":               KindStatic,
+		"/settings":       KindStatic,
+		"/_app/x.DEAD.js": KindStatic,
+	}
+	for path, want := range cases {
+		if got := Classify(path, "/api"); got != want {
+			t.Errorf("Classify(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func levelOf(t *testing.T, target string, status int) (string, string) {
+	t.Helper()
+	var buffer bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	handler := RequestLogger(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, target, nil))
+
+	var record map[string]any
+	if err := json.Unmarshal(buffer.Bytes(), &record); err != nil {
+		t.Fatalf("log line is not JSON: %v (%s)", err, buffer.String())
+	}
+	level, _ := record["level"].(string)
+	kind, _ := record["kind"].(string)
+	return level, kind
+}
+
+func TestStaticAndHealthAreQuietSoJournalIsNotFlooded(t *testing.T) {
+	cases := map[string]struct{ level, kind string }{
+		"/api/pastes":     {"INFO", "api"},
+		"/_app/x.DEAD.js": {"DEBUG", "static"},
+		"/settings":       {"DEBUG", "static"},
+		"/health":         {"DEBUG", "health"},
+	}
+	for target, want := range cases {
+		level, kind := levelOf(t, target, http.StatusOK)
+		if level != want.level || kind != want.kind {
+			t.Errorf("%s logged at %s kind=%s, want %s kind=%s", target, level, kind, want.level, want.kind)
+		}
+	}
+}
+
+func TestServerErrorsAreLoudWhateverTheyServed(t *testing.T) {
+	if level, _ := levelOf(t, "/_app/x.DEAD.js", http.StatusInternalServerError); level != "ERROR" {
+		t.Errorf("a 500 on a static path logged at %s, want ERROR", level)
+	}
+}
+
+func TestQuietRequestsAreDroppedAtInfoLevel(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	handler := RequestLogger(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/_app/x.DEAD.js", nil))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/health", nil))
+	if buffer.Len() != 0 {
+		t.Fatalf("asset and probe traffic reached an info-level logger: %s", buffer.String())
+	}
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/pastes", nil))
+	if buffer.Len() == 0 {
+		t.Error("API traffic was dropped at info level")
+	}
 }

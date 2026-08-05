@@ -6,6 +6,27 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-05
+
+Consequence of the mono-container shape: one binary now serves the API *and* the client's static
+assets, so a single request logger sees both.
+
+### Changed
+
+- `middleware.RequestLogger` classifies every request and records a **`kind`** field —
+  `api`, `health` or `static` — and logs each class at a level that matches its value:
+  - **`api` at info**, as before.
+  - **`static` and `health` at debug.** Bundle requests and a healthcheck firing every ten
+    seconds are not signal. At info they would bury the API traffic in `docker logs` and, worse,
+    ship thousands of asset lines a day into Journal — the shipping handler forwards whatever the
+    underlying handler admits, and apps run at info, so debug records never leave the host.
+  - **any 5xx at error**, whatever it was serving. A failing asset is still a failure.
+- `middleware.RequestLoggerWith` takes the classification rules explicitly (`APIPrefix`,
+  `QuietLevel`); `RequestLogger` is unchanged in signature and defaults to `/api` and debug.
+- `middleware.Classify` is exported so an app can make the same distinction elsewhere.
+
+Set `LOG_LEVEL=debug` on an app to see asset and probe traffic again.
+
 ## [0.4.0] — 2026-08-05
 
 ### Added
@@ -100,7 +121,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.5.0
 [0.4.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.4.0
 [0.3.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.3.0
 [0.2.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.2.0

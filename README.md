@@ -64,7 +64,7 @@ func main() {
 | `errors` | the error envelope: a code, a message, a wrapped cause, and one code→status map |
 | `httpjson` | `DecodeJSON` (1 MB cap, unknown fields rejected, single object enforced), `DecodeGzipJSON` (bomb-safe), `WriteJSON`, `WriteError` |
 | `logger` | slog JSON on stdout, level from config, and a `Wrap` seam for log shipping |
-| `middleware` | `RequestLogger`, `CORS`, `Recoverer` |
+| `middleware` | `RequestLogger` (classifies api / health / static and logs each at a matching level), `CORS`, `Recoverer` |
 | `httpx` | `NewRouter` — the standard chi chain, assembled once |
 | `health` | `/health` and `/ready`, mounted at both the root and `/api` |
 | `healthcheck` | a `healthcheck` argv hook so a distroless container can probe itself |
@@ -177,7 +177,7 @@ broken tool anywhere in a global config would otherwise take the gate down.
 Semver tags, never branch tracking:
 
 ```
-require github.com/FacileStudio/tronc v0.4.0
+require github.com/FacileStudio/tronc v0.5.0
 ```
 
 Breaking changes bump the minor while `v0`. See [CHANGELOG.md](CHANGELOG.md).
