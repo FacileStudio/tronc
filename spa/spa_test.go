@@ -121,3 +121,28 @@ func TestDirFromEnv(t *testing.T) {
 		t.Errorf("DirFromEnv() = %q", got)
 	}
 }
+
+func TestNonReadMethodsAreRefusedNotAnsweredWithTheIndex(t *testing.T) {
+	handler := Handler(Config{Dir: build(t)})
+
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(method, "/ingest", nil))
+
+		if recorder.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s /ingest = %d, want 405 — a 2xx here makes a log shipper drop its payload silently", method, recorder.Code)
+		}
+		if strings.Contains(recorder.Body.String(), "<title>") {
+			t.Errorf("%s /ingest received the index document", method)
+		}
+		if allow := recorder.Header().Get("Allow"); allow != "GET, HEAD" {
+			t.Errorf("%s Allow = %q", method, allow)
+		}
+	}
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodHead, "/settings", nil))
+	if recorder.Code != http.StatusOK {
+		t.Errorf("HEAD /settings = %d, want 200", recorder.Code)
+	}
+}
