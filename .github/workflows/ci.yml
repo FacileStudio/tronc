@@ -9,6 +9,10 @@ permissions:
   contents: read
 
 jobs:
+  # The root module, on the oldest Go the suite still runs. Pinning 1.24 here is
+  # what keeps the documented floor honest: build it only on a newer toolchain
+  # and a 1.25-only construct lands in the chassis without anyone noticing.
+  # gofmt is a plain file walk, so this step covers the nested modules too.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -22,3 +26,23 @@ jobs:
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.12.2
+
+  # migrate is a separate module, so `./...` above never reaches it. It also
+  # needs a newer Go than the root: goose declares go 1.25.7.
+  check-migrate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: migrate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+          working-directory: migrate
+          args: --config ../.golangci.yml

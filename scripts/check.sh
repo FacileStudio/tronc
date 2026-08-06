@@ -25,7 +25,14 @@ case "${1:-}" in
   ;;
 esac
 
-cd "$(git rev-parse --show-toplevel)"
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+# Nested modules, each with its own go.mod. Every `./...` below stops at their
+# directory boundary, so they need naming explicitly or they get no gate at all.
+# `gofmt -l .` is the exception: it is a plain file walk and knows nothing of
+# modules, so it already covers them. Keep this in step with the go.mod files.
+NESTED="migrate"
 
 # Resolve the toolchain from GOROOT when it is set. mise exports GOROOT for the
 # version this repo pins, but leaves an unrelated `go` earlier on PATH (Homebrew's,
@@ -45,6 +52,9 @@ fi
 
 if [ "$mode" = "format" ]; then
   "$GO" fmt ./...
+  for module in $NESTED; do
+    "$GO" -C "$module" fmt ./...
+  done
   exit 0
 fi
 
@@ -60,12 +70,24 @@ fi
 "$GO" vet ./... || status=1
 "$GO" test ./... || status=1
 
+for module in $NESTED; do
+  ("$GO" -C "$module" vet ./...) || status=1
+  ("$GO" -C "$module" test ./...) || status=1
+done
+
 if [ "$mode" = "all" ]; then
   # `command -v` is not enough: a mise shim for an uninstalled version is on
   # PATH and resolves, but every invocation of it fails. Probe that the binary
   # actually runs, so an unusable tool skips the pass instead of failing it.
   if golangci-lint version >/dev/null 2>&1; then
     golangci-lint run ./... || status=1
+    # Naming the nested module as a second pattern instead — `golangci-lint run
+    # ./... ./migrate/...` — reports "directory prefix migrate does not contain
+    # main module" on stderr and still exits 0. cd, and pass the config
+    # explicitly rather than relying on the upward config search.
+    for module in $NESTED; do
+      (cd "$module" && golangci-lint run --config "$root/.golangci.yml" ./...) || status=1
+    done
   else
     echo "check: no usable 'golangci-lint', skipping the lint pass (CI still runs it)" >&2
   fi

@@ -6,6 +6,31 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- `migrate/` — ordered database migrations, as a **separate module** with its own tags and its
+  own history in [migrate/CHANGELOG.md](migrate/CHANGELOG.md). Nothing in the root module
+  changes: importing `tronc` still pulls chi and nothing else.
+
+  It is separate precisely so that stays true. Go modules are all-or-nothing per module path, so
+  putting goose in the root would hand it to all ten consumers — including Jardin, which keeps
+  its state in files and has no database at all — and would push the root's `go` directive from
+  1.24 to goose's 1.25.7.
+
+- The quality gate now covers nested modules. `go build|vet|test ./...` and
+  `golangci-lint run ./...` all stop at a directory carrying its own `go.mod`, silently and with
+  a passing exit code, so `migrate` would have shipped with no gate whatsoever. `scripts/check.sh`
+  loops over `$NESTED`, and CI runs a second job for it. Naming the module as an extra pattern
+  (`golangci-lint run ./... ./migrate/...`) is not a fix — it logs
+  `directory prefix migrate does not contain main module` and still exits 0.
+
+  The root CI job stays pinned to Go 1.24 on purpose. Building the chassis only on a newer
+  toolchain is how a 1.25-only construct would reach a consumer that is still on the floor.
+
+### Fixed
+
+- The `[Unreleased]` link still compared from `v0.8.0` and there was no `[0.9.0]` line at all.
+
 ## [0.9.0] — 2026-08-06
 
 ### Added
@@ -192,7 +217,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.9.0
 [0.8.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.8.0
 [0.7.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.7.0
 [0.6.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.6.0

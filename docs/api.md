@@ -1,7 +1,8 @@
 # tronc — API
 
-The complete exported surface, package by package. Nine packages, all importable under
-`github.com/FacileStudio/tronc/<package>`. Behavior and rationale live in
+The complete exported surface, package by package. Ten packages importable under
+`github.com/FacileStudio/tronc/<package>`, plus `migrate`, which shares the path but is a
+separate module with its own `go.mod` and tags. Behavior and rationale live in
 [architecture.md](architecture.md); this page is the reference.
 
 ## `errors`
@@ -353,3 +354,53 @@ cannot change every suite app's page without a commit. That is one remote reques
 developer-facing page, but it does mean `/docs` renders blank on an air-gapped deployment.
 Set `Config.ScriptURL` to a locally served copy where that matters. Nothing else in tronc
 reaches the network.
+
+## `migrate`
+
+**A separate module.** `go get github.com/FacileStudio/tronc/migrate@v0.1.0` — the git tag is
+`migrate/v0.1.0`, but the subdirectory lives in the module path, not in the version query.
+Importing `tronc` does not pull it, which is the point: it depends on
+`github.com/pressly/goose/v3`, and apps with no database should not carry a migration engine.
+
+```go
+const TableName = goose.DefaultTablename // "goose_db_version"
+
+type Config struct {
+	DB     *sql.DB      // required; from gormDB.DB() on GORM apps
+	FS     fs.FS        // required; rooted at the migrations directory
+	Logger *slog.Logger // defaults to slog.Default()
+	LockID int64        // defaults to lock.DefaultLockID
+}
+
+func Run(ctx context.Context, cfg Config) error
+func Command(ctx context.Context, args []string, cfg Config) (handled bool, err error)
+```
+
+`Run` applies pending migrations behind a Postgres session advisory lock and is a no-op when
+the schema is current. `Command` handles `migrate status|version|up|baseline <n>`, returning
+`false` for a normal start so `main` can continue.
+
+| Subcommand | Effect |
+|---|---|
+| `status` | one line per migration: version, state, applied-at, path. The default |
+| `version` | the current schema version as a bare number |
+| `up` | apply everything pending — the same path `Run` takes |
+| `baseline <n>` | record migrations up to `n` as applied **without running them** |
+
+Three things that are easy to get wrong:
+
+1. **Pass the filesystem through `fs.Sub`.** An `embed.FS` preserves the directory it embedded,
+   so handing it over raw means goose looks at the root and finds nothing. A migration set that
+   fails to embed would otherwise start cleanly against whatever schema happened to be there,
+   which is why `newProvider` refuses a filesystem with no migrations at all.
+2. **The pool must allow more than one connection.** The advisory lock pins one for the whole
+   run; a pool capped at one deadlocks against itself.
+3. **Never call the provider's `Close`.** goose's `Close` closes the underlying `*sql.DB`, which
+   belongs to the caller. This package does not expose one.
+
+`baseline` exists because goose has no stamp command of its own, and the documented workaround —
+a raw `INSERT` into the ledger — needs a `psql` that a distroless image does not ship. It asks
+goose to create the ledger table rather than emitting the DDL itself, because goose writes a
+`version_id = 0` sentinel row on creation and every later command fails with
+`missing zero version migration` without it. It refuses to stamp a database that already has
+history.
