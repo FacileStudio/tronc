@@ -39,10 +39,18 @@ func TestSchemaNameIsSafeToInterpolate(t *testing.T) {
 }
 
 func TestSchemaNameIsStableAcrossCalls(t *testing.T) {
-	// Two calls in one binary must agree, or Open would create one schema and
-	// connect to another.
-	if SchemaName("x") != SchemaName("x") {
-		t.Error("SchemaName is not stable within a binary")
+	// Open creates the schema on one connection and then reconnects scoped to
+	// it, so anything random in here — a PID, a timestamp — would leave it
+	// connected to a schema that was never created.
+	first, second := SchemaName("x"), SchemaName("x")
+	if first != second {
+		t.Errorf("SchemaName returned %q and then %q", first, second)
+	}
+}
+
+func TestSchemaNameSeparatesPrefixes(t *testing.T) {
+	if SchemaName("capsule_test") == SchemaName("sablier_test") {
+		t.Error("two apps sharing a test database would collide on one schema")
 	}
 }
 

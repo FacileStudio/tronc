@@ -8,6 +8,15 @@ semver — while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-08-06
+
+### Fixed
+
+- A test compared `SchemaName("x")` with itself, which staticcheck reads as SA4000 — an
+  identical expression on both sides of `!=`. The property is worth pinning (a random suffix
+  would leave `Open` connected to a schema it never created), so it is now asserted through
+  variables, alongside a new check that two prefixes cannot collide. No change to the package.
+
 ## [0.1.0] — 2026-08-06
 
 ### Added
@@ -43,5 +52,6 @@ Three defects in the harness this was lifted from, all of which would have been 
 - Deliberately not part of `migrate`: that module takes a `*sql.DB` and never a driver, and
   mixing a test harness into it would drag GORM in behind it.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/testdb/v0.1.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/testdb/v0.1.1...HEAD
+[0.1.1]: https://github.com/FacileStudio/tronc/releases/tag/testdb%2Fv0.1.1
 [0.1.0]: https://github.com/FacileStudio/tronc/releases/tag/testdb%2Fv0.1.0
