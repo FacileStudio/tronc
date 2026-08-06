@@ -21,6 +21,8 @@ today.
 - Reads the configuration every Facile API shares, plus typed helpers for the rest
 - Turns a route registry into OpenAPI 3.1 behind a Scalar reference at `/docs`, and reports
   routes the registry forgot
+- Applies ordered database migrations from inside the binary, via the separate
+  [`migrate`](migrate/) module — so the dependency lands only on apps that have a database
 
 ## Stack
 
@@ -111,8 +113,12 @@ healthcheck/  an argv hook so a distroless container can probe itself
 spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers
 apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
+migrate/      SEPARATE MODULE — goose migrations and a `migrate` subcommand
 docs/         architecture, configuration, development, API reference
 ```
+
+`migrate/` carries its own `go.mod`, its own tags and its own dependency. Nothing above it
+changes: importing `tronc` still pulls chi and nothing else. See [migrate/README.md](migrate/).
 
 ## Documentation
 
