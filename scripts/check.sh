@@ -32,7 +32,7 @@ cd "$root"
 # directory boundary, so they need naming explicitly or they get no gate at all.
 # `gofmt -l .` is the exception: it is a plain file walk and knows nothing of
 # modules, so it already covers them. Keep this in step with the go.mod files.
-NESTED="migrate"
+NESTED="migrate testdb"
 
 # Resolve the toolchain from GOROOT when it is set. mise exports GOROOT for the
 # version this repo pins, but leaves an unrelated `go` earlier on PATH (Homebrew's,

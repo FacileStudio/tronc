@@ -27,22 +27,31 @@ jobs:
         with:
           version: v2.12.2
 
-  # migrate is a separate module, so `./...` above never reaches it. It also
-  # needs a newer Go than the root: goose declares go 1.25.7.
-  check-migrate:
+  # The nested modules. `./...` above never reaches them, and they do not share
+  # a Go floor: migrate needs 1.25 because goose declares go 1.25.7, while
+  # testdb stays on 1.24 with the root.
+  check-modules:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: migrate
+            go: "1.25"
+          - module: testdb
+            go: "1.24"
     defaults:
       run:
-        working-directory: migrate
+        working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: ${{ matrix.go }}
       - run: go vet ./...
       - run: go test -race ./...
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.12.2
-          working-directory: migrate
+          working-directory: ${{ matrix.module }}
           args: --config ../.golangci.yml

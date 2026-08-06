@@ -17,6 +17,17 @@ while on `v0`, a breaking change bumps the minor.
   its state in files and has no database at all — and would push the root's `go` directive from
   1.24 to goose's 1.25.7.
 
+- `testdb/` — a real PostgreSQL for tests, one schema per test binary, as a second separate
+  module. Lifted from Casier's `internal/testdb`, which was the only harness in the suite not
+  testing against SQLite, and fixed in three places: `Truncate` no longer empties goose's ledger
+  (it does not drop tables, so the next run replayed from version 0 and died on
+  `relation already exists`), the DSN gains a `connect_timeout` (pgx has none, so a blackholed
+  host blocks ~75s per attempt inside a pre-push hook), and the libpq key/value DSN form no
+  longer gets a `?search_path=` appended to it.
+
+  It needs gorm and the Postgres driver, which the root module must never have. Every Go repo in
+  the suite already has both, so consumers gain nothing new.
+
 - The quality gate now covers nested modules. `go build|vet|test ./...` and
   `golangci-lint run ./...` all stop at a directory carrying its own `go.mod`, silently and with
   a passing exit code, so `migrate` would have shipped with no gate whatsoever. `scripts/check.sh`

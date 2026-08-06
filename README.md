@@ -23,6 +23,8 @@ today.
   routes the registry forgot
 - Applies ordered database migrations from inside the binary, via the separate
   [`migrate`](migrate/) module — so the dependency lands only on apps that have a database
+- Gives tests a real PostgreSQL, one schema per test binary, via the separate
+  [`testdb`](testdb/) module
 
 ## Stack
 
@@ -114,11 +116,13 @@ spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers
 apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
 migrate/      SEPARATE MODULE — goose migrations and a `migrate` subcommand
+testdb/       SEPARATE MODULE — a real Postgres for tests, one schema per binary
 docs/         architecture, configuration, development, API reference
 ```
 
-`migrate/` carries its own `go.mod`, its own tags and its own dependency. Nothing above it
-changes: importing `tronc` still pulls chi and nothing else. See [migrate/README.md](migrate/).
+`migrate/` and `testdb/` each carry their own `go.mod`, tags and dependencies. Nothing above
+them changes: importing `tronc` still pulls chi and nothing else. See
+[migrate/README.md](migrate/) and [testdb/README.md](testdb/).
 
 ## Documentation
 
