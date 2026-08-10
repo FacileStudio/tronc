@@ -201,3 +201,51 @@ func TestRouterHonoursAnEmptyTrustedProxyList(t *testing.T) {
 		t.Fatalf("RemoteAddr = %q, want the connection address", seen)
 	}
 }
+
+// Vision's routes sit at the root because the proxy in front strips /api, so
+// the default prefix classified every API call as static and logged it at the
+// quiet level — which is indistinguishable from an app that logs nothing.
+func TestAPIPrefixDecidesWhatCountsAsAnAPIRequest(t *testing.T) {
+	var buffer bytes.Buffer
+	router := NewRouter(Config{
+		Logger:    slog.New(slog.NewJSONHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		APIPrefix: RootAPI,
+	})
+	router.Get("/auth/me", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+	if !bytes.Contains(buffer.Bytes(), []byte(`"kind":"api"`)) {
+		t.Fatalf("a root-mounted route was not classified as api: %s", buffer.String())
+	}
+}
+
+// Health stays quiet whatever the prefix: it is matched before the prefix is
+// consulted, so an empty prefix must not turn probes into log noise.
+func TestHealthStaysQuietUnderTheRootPrefix(t *testing.T) {
+	var buffer bytes.Buffer
+	router := NewRouter(Config{
+		Logger:    slog.New(slog.NewJSONHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		APIPrefix: RootAPI,
+	})
+	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	if bytes.Contains(buffer.Bytes(), []byte("http request")) {
+		t.Fatalf("a health probe was logged at info: %s", buffer.String())
+	}
+}
+
+// The default is unchanged for every app that never sets it.
+func TestAPIPrefixDefaultsToApi(t *testing.T) {
+	var buffer bytes.Buffer
+	router := NewRouter(Config{Logger: slog.New(slog.NewJSONHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelInfo}))})
+	router.Get("/api/things", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/things", nil))
+
+	if !bytes.Contains(buffer.Bytes(), []byte(`"kind":"api"`)) {
+		t.Fatalf("the default prefix stopped working: %s", buffer.String())
+	}
+}

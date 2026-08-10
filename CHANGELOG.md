@@ -4,6 +4,25 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
+## [0.13.0] — 2026-08-10
+
+### Fixed
+
+- **An app whose API is served from the root logged nothing.** `RequestLoggerConfig.APIPrefix`
+  rewrote `""` to `/api`, so "the API is at the root" was unsayable — and `Classify` then put
+  every request in `KindStatic`, which is logged at the quiet level, which is
+  indistinguishable from an app that logs no requests at all. Found on Vision, where the client
+  container strips `/api` before proxying, so the API sees `/auth/me` and had been silent since
+  it adopted the chassis.
+
+  `APIPrefix` is a `*string` on both `RequestLoggerConfig` and the new `httpx.Config.APIPrefix`:
+  nil means `/api`, and `middleware.RootAPI` (also re-exported as `httpx.RootAPI`) means the
+  root. **Breaking** for anyone setting `APIPrefix` directly, which inside this repo was nobody.
+
+  It is the same collapse as the `TRUSTED_PROXIES` and delivery-target cases: a zero value
+  standing in for both "unset" and a legitimate answer. Health probes are matched before the
+  prefix, so they stay quiet under either setting.
+
 ## [0.12.0] — 2026-08-10
 
 ### Added
