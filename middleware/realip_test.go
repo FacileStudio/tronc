@@ -205,3 +205,82 @@ func TestCloudflareRangesAreSane(t *testing.T) {
 		}
 	}
 }
+
+func cfConfig() RealIPConfig {
+	return RealIPConfig{
+		Trusted: append(append([]netip.Prefix{}, DefaultTrustedProxies...), CloudflareProxies...),
+		CDN:     CloudflareProxies,
+		Header:  "Cf-Connecting-Ip",
+	}
+}
+
+func seenWith(t *testing.T, cfg RealIPConfig, peer, forwarded, cdnHeader string) string {
+	t.Helper()
+	var seen string
+	handler := RealIPWith(cfg)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		seen = r.RemoteAddr
+	}))
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.RemoteAddr = peer
+	if forwarded != "" {
+		request.Header.Set("X-Forwarded-For", forwarded)
+	}
+	if cdnHeader != "" {
+		request.Header.Set("Cf-Connecting-Ip", cdnHeader)
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), request)
+	return seen
+}
+
+// Traefik replaces X-Forwarded-For with the address it received from rather
+// than extending it, so behind Cloudflare the app sees a one-entry chain
+// holding the edge and the visitor survives only in Cf-Connecting-Ip. This is
+// the shape observed in production, not a hypothetical.
+func TestCDNHeaderRecoversTheVisitorBehindAReplacingProxy(t *testing.T) {
+	got := seenWith(t, cfConfig(), "10.0.1.30:43516", "172.70.108.91", "2a02:8428:df25:5601::1")
+	if got != "2a02:8428:df25:5601::1" {
+		t.Fatalf("RemoteAddr = %q, want the visitor from the CDN header", got)
+	}
+}
+
+// The condition that keeps this from undoing the package: the origin is
+// reachable directly, so a request that did not come through the CDN carries
+// the sender's own address as the rightmost hop and its header is ignored.
+func TestCDNHeaderIsIgnoredWhenTheRequestSkippedTheCDN(t *testing.T) {
+	got := seenWith(t, cfConfig(), "10.0.1.30:43516", "203.0.113.7", "9.9.9.9")
+	if got != "203.0.113.7" {
+		t.Fatalf("RemoteAddr = %q, want the real sender, not the header they wrote", got)
+	}
+}
+
+// An untrusted peer never reaches the CDN branch at all.
+func TestCDNHeaderIsIgnoredFromAnUntrustedPeer(t *testing.T) {
+	got := seenWith(t, cfConfig(), "203.0.113.7:5555", "172.70.108.91", "9.9.9.9")
+	if got != "203.0.113.7:5555" {
+		t.Fatalf("RemoteAddr = %q, want the connection address", got)
+	}
+}
+
+// A forwarded chain that still carries a real visitor wins over the header:
+// the header is the fallback for a chain that lost it, not a preference.
+func TestForwardedChainWinsOverTheCDNHeader(t *testing.T) {
+	got := seenWith(t, cfConfig(), "10.0.1.30:43516", "198.51.100.4, 172.70.108.91", "9.9.9.9")
+	if got != "198.51.100.4" {
+		t.Fatalf("RemoteAddr = %q, want the forwarded visitor", got)
+	}
+}
+
+// Without the CDN configured the behaviour is exactly v0.11.0's.
+func TestCDNCaseIsOffByDefault(t *testing.T) {
+	got := seenWith(t, RealIPConfig{Trusted: cfConfig().Trusted}, "10.0.1.30:43516", "172.70.108.91", "2a02:8428:df25:5601::1")
+	if got != "10.0.1.30:43516" {
+		t.Fatalf("RemoteAddr = %q, want the connection address", got)
+	}
+}
+
+func TestCDNHeaderMustParse(t *testing.T) {
+	got := seenWith(t, cfConfig(), "10.0.1.30:43516", "172.70.108.91", "not-an-ip")
+	if got != "10.0.1.30:43516" {
+		t.Fatalf("RemoteAddr = %q, want the connection address", got)
+	}
+}
