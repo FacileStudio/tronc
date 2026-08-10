@@ -141,7 +141,34 @@ case-insensitively, and returns the re-encoded query. A query it cannot parse co
 
 `ClientIP` reads `Cf-Connecting-Ip`, then the first `X-Forwarded-For` hop, then `RemoteAddr`.
 Both headers are client-controlled unless a trusted proxy overwrites them, so **never** key a
-rate limiter or an authorization decision on this value — use `RemoteAddr` for those.
+rate limiter or an authorization decision on this value — use `RemoteAddr`, which `RealIP`
+below resolves for exactly that purpose.
+
+### Real IP
+
+| Symbol | Signature |
+|---|---|
+| `RealIP` | `RealIP(trusted []netip.Prefix) func(http.Handler) http.Handler` |
+| `DefaultTrustedProxies` | loopback, RFC1918, link-local, ULA |
+| `ParseTrustedProxies` | `ParseTrustedProxies(values []string) ([]netip.Prefix, error)` |
+| `TrustedBy` | `TrustedBy(addr netip.Addr, trusted []netip.Prefix) bool` |
+
+Rewrites `RemoteAddr` from `X-Forwarded-For` **only when the peer is one of `trusted`**. That
+is the whole difference from chi's middleware of the same name, and it is not cosmetic: chi's
+rewrites on every request whatever the peer, so anything able to set a header hands itself a
+fresh identity and every per-IP rate limit downstream becomes decorative. Measured on Journal
+before this landed — 70 requests carrying a rotating `X-Forwarded-For` were all accepted
+against a 60/min bucket that should have refused ten.
+
+The header is walked **right to left**, skipping hops that are themselves trusted proxies, and
+the first hop that is not becomes `RemoteAddr`. Each proxy appends the address it received
+from, so the rightmost entry is the one written by the nearest hop — the only entry no client
+could have forged — and walking left from there survives a chain without believing anything
+the client wrote. An unparsable hop stops the walk: everything to its left was written by
+whoever wrote it.
+
+A nil or empty `trusted` ignores the header entirely. `httpx.Config.TrustedProxies` is where
+apps set this; see [configuration.md](configuration.md).
 
 ### Recovery
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
 
 	"github.com/FacileStudio/tronc/middleware"
@@ -144,5 +145,59 @@ func TestChainAppliesTheSameStackToAPlainMux(t *testing.T) {
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil || body.Error.Code != "internal" {
 		t.Errorf("panic response was not the envelope: %s", recorder.Body.String())
+	}
+}
+
+// A router built with a zero-value Config must still refuse to believe a
+// stranger's X-Forwarded-For. This is the regression that matters: every app
+// in the suite constructs its router this way, and chi's RealIP — which
+// NewRouter used to install — rewrote RemoteAddr on every request.
+func TestRouterIgnoresForwardedFromAnUntrustedPeer(t *testing.T) {
+	var seen string
+	router := NewRouter(Config{Logger: slog.New(slog.NewJSONHandler(new(bytes.Buffer), nil))})
+	router.Get("/", func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.RemoteAddr = "203.0.113.7:5555"
+	request.Header.Set("X-Forwarded-For", "9.9.9.9")
+	router.ServeHTTP(httptest.NewRecorder(), request)
+
+	if seen != "203.0.113.7:5555" {
+		t.Fatalf("RemoteAddr = %q, want the untouched connection address", seen)
+	}
+}
+
+func TestRouterBelievesTheConfiguredProxy(t *testing.T) {
+	var seen string
+	router := NewRouter(Config{Logger: slog.New(slog.NewJSONHandler(new(bytes.Buffer), nil))})
+	router.Get("/", func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.RemoteAddr = "10.0.0.3:5555"
+	request.Header.Set("X-Forwarded-For", "203.0.113.7")
+	router.ServeHTTP(httptest.NewRecorder(), request)
+
+	if seen != "203.0.113.7" {
+		t.Fatalf("RemoteAddr = %q, want the forwarded client", seen)
+	}
+}
+
+// TrustedProxies distinguishes "unset" from "none": a nil slice takes the
+// default, a non-nil empty one is an operator saying trust nothing.
+func TestRouterHonoursAnEmptyTrustedProxyList(t *testing.T) {
+	var seen string
+	router := NewRouter(Config{
+		Logger:         slog.New(slog.NewJSONHandler(new(bytes.Buffer), nil)),
+		TrustedProxies: []netip.Prefix{},
+	})
+	router.Get("/", func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.RemoteAddr = "10.0.0.3:5555"
+	request.Header.Set("X-Forwarded-For", "203.0.113.7")
+	router.ServeHTTP(httptest.NewRecorder(), request)
+
+	if seen != "10.0.0.3:5555" {
+		t.Fatalf("RemoteAddr = %q, want the connection address", seen)
 	}
 }

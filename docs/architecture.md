@@ -109,6 +109,26 @@ bearer tokens in cleartext, and the logs leave the host.
 `middleware.ClientIP` reads `Cf-Connecting-Ip`, then the first `X-Forwarded-For` hop, then
 `RemoteAddr`. Both headers are client-controlled unless a trusted proxy overwrites them, so
 that value is for logging only — never key a rate limiter or an authorization decision on it.
+Those key on `RemoteAddr`, which `middleware.RealIP` resolves from the forwarded header only
+when the peer is a trusted proxy.
+
+## Why RealIP is ours and not chi's
+
+`NewRouter` installed `chi/middleware.RealIP` until v0.10.0. It rewrites `RemoteAddr` from
+`X-Forwarded-For` unconditionally — no peer check — which means any caller able to set a header
+gets a new identity on every request, and every per-IP limiter in every app on this chassis was
+bypassable. It was measured on Journal, not theorised: 70 requests with a rotating header were
+all accepted against a 60/min bucket.
+
+The obvious alternative — trust nothing and key on the raw connection address — is worse here
+than it looks. Traefik and each API share a Docker network, so every request arrives from one
+private address; a per-IP limiter would collapse into a single global bucket and the login
+limiter would lock out the whole world at once. So the default trusts loopback and the private
+ranges, which is the deployment as it actually exists, and `TRUSTED_PROXIES` narrows it to a
+specific proxy for anyone who wants that.
+
+The residual risk is stated rather than hidden: a peer already inside the private network can
+still speak for a visitor. Narrow the list to Traefik's address to close it.
 
 ## Health and the SPA catch-all
 
