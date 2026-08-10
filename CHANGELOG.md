@@ -4,6 +4,32 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
+## [0.12.0] — 2026-08-10
+
+### Added
+
+- `middleware.RealIPWith(RealIPConfig{Trusted, CDN, Header})`, and `Core.CDNProxies` /
+  `Core.CDNHeader` populated when `TRUSTED_PROXIES` names `cloudflare`. Naming the CDN is what
+  opts in: "this app is served through Cloudflare" is both why the edge is trusted and why
+  `Cf-Connecting-Ip` means anything.
+
+  v0.11.0 was not enough on its own, and production said so. **Traefik does not extend an
+  incoming `X-Forwarded-For` — it replaces it** with the address it received from. So behind
+  Cloudflare the app sees a one-entry chain holding the edge, the walk consumes it, nothing is
+  left, and `RemoteAddr` stayed the Docker-internal peer: measured on Journal after the v0.11.0
+  deploy, `remote_addr` `10.0.1.30:43516` with the visitor present only in `Cf-Connecting-Ip`.
+
+  So the visitor is now recovered from the CDN header — **on one condition**: the rightmost
+  forwarded hop must itself be a CDN address. That is the proof the request entered through the
+  CDN. Believing the header unconditionally would undo the entire package, because the origin is
+  reachable directly (verified: `curl --resolve journal.facile.studio:443:65.108.2.107` answers
+  200) and anything reaching it could set the header. A request that skipped the CDN carries its
+  own sender as the rightmost hop, fails the check, and is treated as the client it is. There is a
+  test for exactly that.
+
+  A forwarded chain that still holds a real visitor wins over the header — the header is the
+  fallback for a chain that lost it, not a preference.
+
 ## [0.11.0] — 2026-08-10
 
 ### Added

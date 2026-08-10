@@ -73,6 +73,13 @@ Cloudflare appends the visitor's address rather than replacing the header, so th
 cannot reach anything a client seeded, which is what defeats the "point my own Cloudflare zone at
 your origin" attack.
 
+Naming `cloudflare` also enables reading `Cf-Connecting-Ip`, and that is not redundant: **Traefik
+replaces the incoming `X-Forwarded-For` rather than extending it**, so behind a CDN the chain the
+app sees holds only the edge and the visitor survives nowhere else. The header is believed on one
+condition — the rightmost forwarded hop is itself a Cloudflare address, proving the request came
+through Cloudflare. A request sent straight to the origin carries its own sender there instead and
+its header is ignored.
+
 **Unset means loopback and the private ranges**, which is every Facile deployment: Traefik and
 the API share a Docker network, so the peer is always private and the header is the only way to
 tell two visitors apart. Trusting nothing by default would look stricter and behave worse —
