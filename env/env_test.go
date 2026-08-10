@@ -2,6 +2,7 @@ package env
 
 import (
 	"github.com/FacileStudio/tronc/middleware"
+	"net/netip"
 
 	"slices"
 	"testing"
@@ -155,5 +156,37 @@ func TestTrustedProxies(t *testing.T) {
 	t.Setenv("TRUSTED_PROXIES", "not-a-network")
 	if _, err := TrustedProxies(); err == nil {
 		t.Error("garbage was accepted; a bad proxy list must fail at boot, not at the first request")
+	}
+}
+
+// A deployment should say what it is fronted by, not paste two dozen ranges
+// into its environment — and the two forms have to compose.
+func TestTrustedProxiesNamedSets(t *testing.T) {
+	t.Setenv("TRUSTED_PROXIES", "private,cloudflare")
+	got, err := TrustedProxies()
+	if err != nil {
+		t.Fatalf("TrustedProxies: %v", err)
+	}
+	want := len(middleware.DefaultTrustedProxies) + len(middleware.CloudflareProxies)
+	if len(got) != want {
+		t.Fatalf("got %d prefixes, want %d", len(got), want)
+	}
+	if !middleware.TrustedBy(netip.MustParseAddr("172.70.108.91"), got) {
+		t.Error("a Cloudflare edge is not trusted under the cloudflare name")
+	}
+	if !middleware.TrustedBy(netip.MustParseAddr("10.0.0.3"), got) {
+		t.Error("Traefik is not trusted under the private name")
+	}
+
+	t.Setenv("TRUSTED_PROXIES", "CloudFlare, 198.51.100.4")
+	mixed, err := TrustedProxies()
+	if err != nil {
+		t.Fatalf("TrustedProxies: %v", err)
+	}
+	if !middleware.TrustedBy(netip.MustParseAddr("198.51.100.4"), mixed) {
+		t.Error("a literal address alongside a name was dropped")
+	}
+	if middleware.TrustedBy(netip.MustParseAddr("10.0.0.3"), mixed) {
+		t.Error("naming cloudflare alone silently included the private ranges")
 	}
 }
