@@ -18,6 +18,16 @@ type Config struct {
 	Logger *slog.Logger
 	// CORS is applied when AllowedOrigins is non-empty.
 	CORS middleware.CORSConfig
+	// APIPrefix is where this app's API lives, for request-log
+	// classification. nil means /api.
+	//
+	// It is a pointer because "" is a real answer — an app whose routes sit
+	// at the root, because a proxy in front strips the prefix, has an empty
+	// prefix — and a plain string could not tell that apart from unset. Get
+	// it wrong and every request is classified as static and logged at the
+	// quiet level, which reads exactly like an app that logs nothing at all.
+	// Use httpx.RootAPI for that case.
+	APIPrefix *string
 	// CDNProxies and CDNHeader recover the visitor when the proxy in front
 	// replaced the forwarded chain rather than extending it. env.Core fills
 	// them from TRUSTED_PROXIES; leaving them zero disables the case.
@@ -31,9 +41,16 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 }
 
-// trustedProxies resolves the configured set, distinguishing "unset" from
-// "deliberately empty". A nil slice means the app said nothing and gets the
-// default; a non-nil empty slice means it said none, and is honoured.
+// RootAPI is Config.APIPrefix for an app serving its API from the root.
+var RootAPI = middleware.RootAPI
+
+func (c Config) requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
+	if c.APIPrefix == nil {
+		return middleware.RequestLogger(logger)
+	}
+	return middleware.RequestLoggerWith(logger, middleware.RequestLoggerConfig{APIPrefix: c.APIPrefix})
+}
+
 func (c Config) realIP() middleware.RealIPConfig {
 	return middleware.RealIPConfig{
 		Trusted: c.trustedProxies(),
@@ -42,6 +59,9 @@ func (c Config) realIP() middleware.RealIPConfig {
 	}
 }
 
+// trustedProxies resolves the configured set, distinguishing "unset" from
+// "deliberately empty". A nil slice means the app said nothing and gets the
+// default; a non-nil empty slice means it said none, and is honoured.
 func (c Config) trustedProxies() []netip.Prefix {
 	if c.TrustedProxies == nil {
 		return middleware.DefaultTrustedProxies
@@ -60,7 +80,7 @@ func Chain(cfg Config, next http.Handler) http.Handler {
 	}
 
 	handler := next
-	handler = middleware.RequestLogger(logger)(handler)
+	handler = cfg.requestLogger(logger)(handler)
 	if len(cfg.CORS.AllowedOrigins) > 0 {
 		handler = middleware.CORS(cfg.CORS)(handler)
 	}
@@ -97,6 +117,6 @@ func NewRouter(cfg Config) *chi.Mux {
 	if len(cfg.CORS.AllowedOrigins) > 0 {
 		router.Use(middleware.CORS(cfg.CORS))
 	}
-	router.Use(middleware.RequestLogger(logger))
+	router.Use(cfg.requestLogger(logger))
 	return router
 }

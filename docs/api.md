@@ -119,7 +119,7 @@ set. Apps with a custom header — Capsule's `X-Delete-Token` — extend `Allowe
 |---|---|
 | `RequestLogger` | `RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler` |
 | `RequestLoggerWith` | `RequestLoggerWith(logger *slog.Logger, cfg RequestLoggerConfig) func(http.Handler) http.Handler` |
-| `RequestLoggerConfig` | `{ APIPrefix string; QuietLevel slog.Level }`, defaulting to `/api` and `slog.LevelDebug` |
+| `RequestLoggerConfig` | `{ APIPrefix *string; QuietLevel slog.Level }`, defaulting to `/api` and `slog.LevelDebug`. `middleware.RootAPI` is the value for an API served from the root — `""` and nil are different answers |
 | `Kind` | `string` alias, with `KindAPI` `"api"`, `KindHealth` `"health"`, `KindStatic` `"static"` |
 | `Classify` | `Classify(path, apiPrefix string) Kind` |
 | `ClientIP` | `ClientIP(request *http.Request) string` |
