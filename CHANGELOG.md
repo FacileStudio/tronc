@@ -4,6 +4,21 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
+## [0.10.1] — 2026-08-10
+
+### Changed
+
+- Comments moved out of function bodies and into the doc blocks above them, across `errors`,
+  `middleware`, `migrate`, `spa` and `testdb`. No behaviour change and no API change: the diff
+  is comments and gofmt alignment only.
+
+  It is the house rule applied to the chassis — an explanation that only exists three levels
+  inside a function body is invisible to anyone reading the package through `go doc` or an
+  editor's hover, which is where a shared library is actually read.
+
+- `filet.yml` checks in the quality-gate configuration, with `gen.line.long` disabled because
+  gofmt already owns line width.
+
 ## [0.10.0] — 2026-08-10
 
 ### Security

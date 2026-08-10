@@ -129,6 +129,9 @@ func TestNewProviderRejectsAFilesystemWithNoMigrations(t *testing.T) {
 	}
 }
 
+// TestSourcesAreReadFromTheFilesystemRoot pins that fs.Sub is the caller's job:
+// a path carrying a directory prefix means the embed.FS was passed in raw and
+// goose would find nothing.
 func TestSourcesAreReadFromTheFilesystemRoot(t *testing.T) {
 	provider, err := newProvider(Config{DB: stubDB(t), FS: oneMigration()})
 	if err != nil {
@@ -145,16 +148,15 @@ func TestSourcesAreReadFromTheFilesystemRoot(t *testing.T) {
 	if sources[0].Type != goose.TypeSQL {
 		t.Errorf("type is %q, want %q", sources[0].Type, goose.TypeSQL)
 	}
-	// fs.Sub is the caller's job: a path carrying a directory prefix means the
-	// embed.FS was passed in raw and goose would find nothing.
 	if sources[0].Path != "00001_baseline.sql" {
 		t.Errorf("path is %q; the filesystem was not rooted at the migrations directory", sources[0].Path)
 	}
 }
 
+// TestLoggerDefaultsRatherThanPanicking covers the fact that goose rejects a nil
+// *slog.Logger outright, so an app that never set one would fail to construct a
+// provider at all.
 func TestLoggerDefaultsRatherThanPanicking(t *testing.T) {
-	// goose rejects a nil *slog.Logger outright, so an app that never set one
-	// would fail to construct a provider at all.
 	if (Config{}).logger() == nil {
 		t.Fatal("the default logger is nil")
 	}
