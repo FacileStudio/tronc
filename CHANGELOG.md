@@ -4,7 +4,36 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
-## [Unreleased]
+## [0.10.0] — 2026-08-10
+
+### Security
+
+- **`httpx` no longer installs chi's `RealIP`, which made every per-IP rate limit in every app
+  on this chassis bypassable.** chi's rewrites `RemoteAddr` from `X-Forwarded-For` on every
+  request with no check on the peer, so any caller able to set a header handed itself a fresh
+  identity. Measured on Journal before the fix: 70 requests carrying a rotating
+  `X-Forwarded-For` were **all** accepted against a 60/min bucket that should have refused ten;
+  70 from a fixed value refused ten as designed. Login, register and session limiters were
+  affected in all ten consumers.
+
+  `middleware.RealIP(trusted []netip.Prefix)` replaces it. It believes the header only from a
+  trusted peer, and walks the chain right to left — skipping hops that are themselves trusted —
+  so the entry a client pre-seeds sits to the left of the one the proxy appended and is never
+  reached. An unparsable hop stops the walk rather than reaching past it.
+
+  `httpx.Config.TrustedProxies` and `TRUSTED_PROXIES` configure it. **Unset keeps the current
+  behaviour in every real deployment**: the default trusts loopback and the private ranges,
+  which is what Traefik is. Adopting the bump therefore needs no configuration change — the
+  only requests whose treatment changes are those arriving from a public address with a
+  forwarded header, which is exactly the abuse case.
+
+  Trusting nothing by default was considered and rejected: behind Traefik every request carries
+  one private address, so per-IP limits would collapse into a single global bucket and the login
+  limiter would lock out everyone at once. `TRUSTED_PROXIES=none` selects that behaviour
+  explicitly for anyone who wants it, and narrowing the list to the proxy's own address closes
+  the residual case where a neighbour on the private network speaks for a visitor.
+
+  `middleware.ClientIP` is unchanged and still for logging only.
 
 ### Added
 

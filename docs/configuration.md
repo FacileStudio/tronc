@@ -15,6 +15,7 @@ adopting `env.LoadCore` in an app that already has its own configuration.
 | `LOG_LEVEL` | no | `info` | `debug` / `info` / `warn` / `error`. Anything else means `info` |
 | `APP_ENV` | no | `development` | `development` / `staging` / `production` |
 | `CORS_ALLOWED_ORIGINS` | no | *(none — deny)* | Comma-separated allowed origins |
+| `TRUSTED_PROXIES` | no | loopback + private ranges | Comma-separated CIDR blocks or addresses whose `X-Forwarded-For` is believed. `none` believes no proxy |
 | `JOURNAL_URL` | no | *(none)* | Read into `Core.JournalURL`; wired by the app, not by tronc |
 | `JOURNAL_TOKEN` | no | *(none)* | Read into `Core.JournalToken` |
 
@@ -47,6 +48,32 @@ value and splits it on commas:
 CORS_ALLOWED_ORIGINS  →  ALLOWED_ORIGINS  →  DOMAINS  →  DOMAIN
                       →  CORS_ORIGINS  →  TRUSTED_ORIGINS  →  CLIENT_ORIGIN
 ```
+
+## TRUSTED_PROXIES
+
+Which peers are allowed to speak for a client through `X-Forwarded-For`. It decides what
+`RemoteAddr` is by the time a rate limiter sees it, so it is a security setting, not a logging
+one.
+
+```
+TRUSTED_PROXIES=10.0.0.0/8,192.168.1.7    # CIDR blocks or bare addresses
+TRUSTED_PROXIES=none                      # believe no proxy at all
+```
+
+**Unset means loopback and the private ranges**, which is every Facile deployment: Traefik and
+the API share a Docker network, so the peer is always private and the header is the only way to
+tell two visitors apart. Trusting nothing by default would look stricter and behave worse —
+every request would carry Traefik's single address, one global bucket would replace every
+per-IP limit, and the login limiter would lock out the whole world together.
+
+`none` is spelled out rather than inferred from an empty value, because an empty value is what
+a half-written deployment config produces and that must not silently select the strictest
+setting nobody chose. A list that does not parse fails at boot, not at the first request.
+
+Narrow it to the proxy's own address if the app is reachable from other hosts on the private
+network — with the default, a neighbour on that network can speak for a visitor.
+
+## CORS origin names
 
 `CORS_ALLOWED_ORIGINS` is the canonical name, from `GoSvelteBoilerplate`. The other six are
 the drift that leaked out of it — Agenda, Courrier and Sablier read `DOMAINS`; Plume and

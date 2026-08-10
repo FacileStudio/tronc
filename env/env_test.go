@@ -1,6 +1,8 @@
 package env
 
 import (
+	"github.com/FacileStudio/tronc/middleware"
+
 	"slices"
 	"testing"
 	"time"
@@ -116,5 +118,42 @@ func TestHelpers(t *testing.T) {
 	}
 	if got := List("BLANK"); got != nil {
 		t.Errorf("List on a blank value = %v, want nil", got)
+	}
+}
+
+func TestTrustedProxies(t *testing.T) {
+	t.Setenv("TRUSTED_PROXIES", "")
+	unset, err := TrustedProxies()
+	if err != nil {
+		t.Fatalf("TrustedProxies: %v", err)
+	}
+	if len(unset) != len(middleware.DefaultTrustedProxies) {
+		t.Fatalf("unset gave %d prefixes, want the default set", len(unset))
+	}
+
+	// "none" is spelled out because an empty string is what a half-written
+	// deployment config produces, and that must not silently select the
+	// strictest setting nobody chose.
+	t.Setenv("TRUSTED_PROXIES", "none")
+	none, err := TrustedProxies()
+	if err != nil {
+		t.Fatalf("TrustedProxies: %v", err)
+	}
+	if none == nil || len(none) != 0 {
+		t.Fatalf("none gave %v, want a non-nil empty slice", none)
+	}
+
+	t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8, 192.168.1.7")
+	listed, err := TrustedProxies()
+	if err != nil {
+		t.Fatalf("TrustedProxies: %v", err)
+	}
+	if len(listed) != 2 {
+		t.Fatalf("got %d prefixes, want 2", len(listed))
+	}
+
+	t.Setenv("TRUSTED_PROXIES", "not-a-network")
+	if _, err := TrustedProxies(); err == nil {
+		t.Error("garbage was accepted; a bad proxy list must fail at boot, not at the first request")
 	}
 }
