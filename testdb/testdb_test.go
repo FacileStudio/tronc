@@ -23,9 +23,10 @@ func TestURLReportsWhetherItIsConfigured(t *testing.T) {
 	}
 }
 
+// TestSchemaNameIsSafeToInterpolate guards the fact that the schema name is
+// concatenated into DDL, so anything outside [a-z0-9_] has to be gone by the
+// time it gets there.
 func TestSchemaNameIsSafeToInterpolate(t *testing.T) {
-	// The schema name is concatenated into DDL, so anything outside
-	// [a-z0-9_] has to be gone by the time it gets there.
 	name := SchemaName("capsule_test")
 	for _, r := range name {
 		valid := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_'
@@ -38,10 +39,10 @@ func TestSchemaNameIsSafeToInterpolate(t *testing.T) {
 	}
 }
 
+// TestSchemaNameIsStableAcrossCalls matters because Open creates the schema on
+// one connection and then reconnects scoped to it, so anything random in here —
+// a PID, a timestamp — would leave it connected to a schema never created.
 func TestSchemaNameIsStableAcrossCalls(t *testing.T) {
-	// Open creates the schema on one connection and then reconnects scoped to
-	// it, so anything random in here — a PID, a timestamp — would leave it
-	// connected to a schema that was never created.
 	first, second := SchemaName("x"), SchemaName("x")
 	if first != second {
 		t.Errorf("SchemaName returned %q and then %q", first, second)
@@ -113,9 +114,9 @@ func TestAnnounceNamesTheEnvironmentVariableAndTheCommand(t *testing.T) {
 	}
 }
 
+// TestEnvVarIsTheSuiteWideName pins the name because Casier and Nuage already
+// read it; changing it would strand their CI configuration.
 func TestEnvVarIsTheSuiteWideName(t *testing.T) {
-	// Casier and Nuage already read this exact name; changing it would strand
-	// their CI configuration.
 	if EnvVar != "TEST_DATABASE_URL" {
 		t.Errorf("EnvVar is %q", EnvVar)
 	}
@@ -124,9 +125,10 @@ func TestEnvVarIsTheSuiteWideName(t *testing.T) {
 	}
 }
 
+// TestPackageDoesNotDependOnAnEnvironment guards against someone adding an
+// os.Getenv default: an unset variable must mean skip, never a silent fallback
+// to a real database.
 func TestPackageDoesNotDependOnAnEnvironment(t *testing.T) {
-	// A guard against someone adding an os.Getenv default: an unset variable
-	// must mean skip, never a silent fallback to a real database.
 	os.Unsetenv(EnvVar)
 	if value, ok := URL(); ok {
 		t.Errorf("URL() invented a default: %q", value)
