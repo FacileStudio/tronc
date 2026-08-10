@@ -149,7 +149,8 @@ below resolves for exactly that purpose.
 | Symbol | Signature |
 |---|---|
 | `RealIP` | `RealIP(trusted []netip.Prefix) func(http.Handler) http.Handler` |
-| `DefaultTrustedProxies` | loopback, RFC1918, link-local, ULA |
+| `DefaultTrustedProxies` | loopback, RFC1918, link-local, ULA — the `private` set |
+| `CloudflareProxies` | Cloudflare's published edge ranges — the `cloudflare` set, opt-in |
 | `ParseTrustedProxies` | `ParseTrustedProxies(values []string) ([]netip.Prefix, error)` |
 | `TrustedBy` | `TrustedBy(addr netip.Addr, trusted []netip.Prefix) bool` |
 

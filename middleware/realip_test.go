@@ -158,3 +158,50 @@ func TestRotatingForwardedHeaderCannotMintIdentities(t *testing.T) {
 		t.Fatalf("70 spoofed requests produced %d distinct identities, want 1", len(seen))
 	}
 }
+
+// Behind Cloudflare the chain is [visitor, cf-edge] once Traefik appends, so
+// trusting the edge is what makes the visitor reachable. Without it every
+// visitor behind one edge shares a bucket.
+func TestRealIPWalksPastCloudflare(t *testing.T) {
+	trusted := append(append([]netip.Prefix{}, DefaultTrustedProxies...), CloudflareProxies...)
+
+	got := seenRemoteAddr(t, trusted, "10.0.0.3:5555", "2a02:8428:df25:5601::1, 172.70.108.91")
+	if got != "2a02:8428:df25:5601::1" {
+		t.Fatalf("RemoteAddr = %q, want the visitor behind the Cloudflare edge", got)
+	}
+
+	// Without Cloudflare trusted, the walk stops at the edge — correct, but
+	// coarse. This is the behaviour the opt-in exists to change.
+	if got := seenRemoteAddr(t, DefaultTrustedProxies, "10.0.0.3:5555", "2a02:8428:df25:5601::1, 172.70.108.91"); got != "172.70.108.91" {
+		t.Fatalf("RemoteAddr = %q, want the edge when Cloudflare is not trusted", got)
+	}
+}
+
+// The attack that trusting a CDN normally invites: the attacker points their
+// own Cloudflare zone at this origin, so their traffic arrives from a trusted
+// edge carrying a header they wrote. Cloudflare appends the real address after
+// theirs, and a right-to-left walk therefore never reaches the forged entries.
+func TestCloudflareTrustDoesNotExposeSeededHops(t *testing.T) {
+	trusted := append(append([]netip.Prefix{}, DefaultTrustedProxies...), CloudflareProxies...)
+
+	got := seenRemoteAddr(t, trusted, "10.0.0.3:5555", "1.2.3.4, 9.9.9.9, 203.0.113.7, 172.70.108.91")
+	if got != "203.0.113.7" {
+		t.Fatalf("RemoteAddr = %q, want the address Cloudflare appended, not one the client seeded", got)
+	}
+}
+
+func TestCloudflareRangesAreSane(t *testing.T) {
+	if len(CloudflareProxies) < 20 {
+		t.Fatalf("got %d Cloudflare prefixes, want the published ~22", len(CloudflareProxies))
+	}
+	for _, addr := range []string{"172.70.108.91", "162.158.23.213", "104.16.0.1", "2606:4700::1"} {
+		if !TrustedBy(netip.MustParseAddr(addr), CloudflareProxies) {
+			t.Errorf("%s is a Cloudflare edge and is not covered", addr)
+		}
+	}
+	for _, addr := range []string{"37.65.43.218", "8.8.8.8", "10.0.0.1"} {
+		if TrustedBy(netip.MustParseAddr(addr), CloudflareProxies) {
+			t.Errorf("%s is not Cloudflare and is covered", addr)
+		}
+	}
+}

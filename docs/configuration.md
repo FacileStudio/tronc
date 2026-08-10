@@ -56,9 +56,22 @@ Which peers are allowed to speak for a client through `X-Forwarded-For`. It deci
 one.
 
 ```
+TRUSTED_PROXIES=private,cloudflare        # named sets
 TRUSTED_PROXIES=10.0.0.0/8,192.168.1.7    # CIDR blocks or bare addresses
+TRUSTED_PROXIES=private,198.51.100.4      # both, mixed
 TRUSTED_PROXIES=none                      # believe no proxy at all
 ```
+
+Two names are defined: **`private`** is the default set (loopback and the RFC1918/ULA ranges, i.e.
+Traefik), and **`cloudflare`** is Cloudflare's published edge ranges. Naming `cloudflare` alone does
+*not* imply `private` — list both if both front you, which behind Traefik they do.
+
+**Set `private,cloudflare` on anything served through Cloudflare.** Otherwise the forwarded chain is
+`[visitor, cf-edge]`, the walk stops at the edge, and `RemoteAddr` becomes the edge address: nothing
+is forgeable, but every visitor behind one edge shares a rate-limit bucket. This is safe to enable —
+Cloudflare appends the visitor's address rather than replacing the header, so the right-to-left walk
+cannot reach anything a client seeded, which is what defeats the "point my own Cloudflare zone at
+your origin" attack.
 
 **Unset means loopback and the private ranges**, which is every Facile deployment: Traefik and
 the API share a Docker network, so the peer is always private and the header is the only way to

@@ -4,6 +4,36 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
+## [0.11.0] — 2026-08-10
+
+### Added
+
+- `TRUSTED_PROXIES` accepts **named sets** beside literal CIDRs: `private` (the default) and
+  `cloudflare`, so a deployment says what fronts it instead of pasting two dozen ranges into its
+  environment. `TRUSTED_PROXIES=private,cloudflare`. `middleware.CloudflareProxies` holds the
+  published edge ranges (15 IPv4 + 7 IPv6, fetched 2026-08-10).
+
+  It exists because v0.10.0 exposed a second-order problem. Behind Cloudflare the forwarded chain
+  is `[visitor, cf-edge]`, and with only the private ranges trusted the walk stops at the edge — so
+  `RemoteAddr` became the *edge* address. Nothing is forgeable, but every visitor behind one edge
+  shares a rate-limit bucket and one visitor moving between edges looks like several. The limits
+  hold; they stop describing people. Measured on Journal: `remote_addr` `172.70.108.91`, a
+  Cloudflare edge, against a `client_ip` of the real visitor.
+
+  **Opt-in, not default.** An app that is not behind Cloudflare gains nothing, and a name in a
+  config file is a statement about the deployment that the next person can read.
+
+  Trusting a CDN normally invites the attack where someone points their own Cloudflare zone at your
+  origin, so their traffic arrives from a trusted edge carrying a header they wrote. It does not
+  work here, and the reason is `RealIP`'s right-to-left walk: Cloudflare *appends* the visitor's
+  address rather than replacing the header, so the entries an attacker seeds sit to the left of the
+  one Cloudflare wrote and are never reached. A scheme taking the first hop, or trusting
+  `Cf-Connecting-Ip` outright, would hand them the forged value.
+
+  The list is a snapshot, not a subscription: fetching it at boot would make startup depend on the
+  network and turn a hijacked response into a trust bypass. A stale range degrades attribution for
+  one edge; it opens nothing.
+
 ## [0.10.1] — 2026-08-10
 
 ### Changed
