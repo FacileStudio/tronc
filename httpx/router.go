@@ -7,7 +7,6 @@ import (
 	"net/netip"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/FacileStudio/tronc/middleware"
 )
@@ -86,7 +85,7 @@ func Chain(cfg Config, next http.Handler) http.Handler {
 	}
 	handler = middleware.RealIPWith(cfg.realIP())(handler)
 	handler = middleware.Recoverer(logger)(handler)
-	handler = chimiddleware.RequestID(handler)
+	handler = middleware.RequestID(handler)
 	return handler
 }
 
@@ -95,10 +94,13 @@ func Chain(cfg Config, next http.Handler) http.Handler {
 //
 //	RequestID -> Recoverer -> RealIP -> CORS -> RequestLogger
 //
-// RealIP is tronc's, not chi's. chi's rewrites RemoteAddr from
-// X-Forwarded-For whatever the peer, which makes every per-IP rate limit
-// downstream bypassable by rotating a header. Ours believes the header only
-// from a trusted peer — see Config.TrustedProxies.
+// RealIP and RequestID are tronc's, not chi's. chi's RealIP rewrites
+// RemoteAddr from X-Forwarded-For whatever the peer, which makes every per-IP
+// rate limit downstream bypassable by rotating a header; ours believes the
+// header only from a trusted peer — see Config.TrustedProxies. chi's RequestID
+// takes X-Request-Id verbatim, never echoes it, and mints ids containing the
+// container's hostname; ours bounds what it accepts, echoes what it settled on,
+// and mints something opaque — see middleware.RequestID.
 //
 // Recoverer sits second, not last. The apps currently run it innermost, so a
 // panic raised in CORS or in the request logger escapes to net/http and is
@@ -111,7 +113,7 @@ func NewRouter(cfg Config) *chi.Mux {
 	}
 
 	router := chi.NewRouter()
-	router.Use(chimiddleware.RequestID)
+	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer(logger))
 	router.Use(middleware.RealIPWith(cfg.realIP()))
 	if len(cfg.CORS.AllowedOrigins) > 0 {
