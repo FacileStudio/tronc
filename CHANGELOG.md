@@ -4,6 +4,39 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
+## [0.14.0] — 2026-08-17
+
+### Added
+
+- **`middleware.RequestID`, replacing chi's, so a request id survives the round trip.** It
+  accepts the caller's `X-Request-Id`, **echoes it on the response**, and stores it under chi's
+  context key — `GetReqID`, `RequestLogger` and `Recoverer` keep working untouched, and
+  `middleware.RequestIDFrom` reads it without importing chi.
+
+  The echo is the feature. Journal's browser SDK mints an id before a request leaves the page so
+  a failed fetch can name the id the server logged it under; without an echo the page can never
+  learn the server's own id, and the correlation is one-way guesswork. `CORS` therefore also
+  gained `ExposedHeaders` (default `X-Request-Id`) and lists `X-Request-Id` in
+  `DefaultAllowedHeaders` — a response header is invisible to a script unless it is exposed, so
+  the echo would otherwise arrive and be unreadable.
+
+  Two defects in chi's version came out while wiring it, both of which shipped in every app on
+  the chassis:
+
+  - **The header was taken verbatim** — any bytes, any length. That value is written to every
+    log line the request produces, stored by Journal as `meta.request_id`, and offered in the
+    dashboard as a clickable filter. It is now bounded at `MaxRequestIDLength` (128) and limited
+    to alphanumerics and `-_.:/ `; anything else is replaced with a freshly minted id rather than
+    escaped. Same shape of bug as the `RealIP` one in 0.10.0: a header believed without being
+    checked.
+  - **chi's minted id embeds `os.Hostname()`** and a per-process counter. Harmless while nothing
+    echoed it; a hostname disclosure the moment something did. Ours is `crypto/rand.Text()` and
+    says nothing about the machine.
+
+  **Behaviour change**, not an API break: ids look different, and a caller sending a malformed
+  one now gets a minted id instead of seeing its own reflected in the logs. `ExposedHeaders`
+  follows the `TrustedProxies` convention — `nil` is unset, a non-nil empty slice means none.
+
 ## [0.13.0] — 2026-08-10
 
 ### Fixed

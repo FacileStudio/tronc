@@ -106,12 +106,32 @@ case- and whitespace-insensitive, accepts `warning` as well as `warn`, and retur
 |---|---|---|---|
 | `AllowedOrigins` | `[]string` | — | Matched exactly. Empty denies all cross-origin requests |
 | `AllowCredentials` | `bool` | `false` | Sends `Access-Control-Allow-Credentials: true` |
-| `AllowedHeaders` | `[]string` | `DefaultAllowedHeaders` | `Accept`, `Authorization`, `Content-Type` |
+| `AllowedHeaders` | `[]string` | `DefaultAllowedHeaders` | `Accept`, `Authorization`, `Content-Type`, `X-Request-Id` |
 | `AllowedMethods` | `[]string` | `DefaultAllowedMethods` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS` |
+| `ExposedHeaders` | `[]string` | `DefaultExposedHeaders` | `X-Request-Id`. `nil` is unset; a non-nil empty slice exposes none |
 | `MaxAgeSeconds` | `int` | `600` | `Access-Control-Max-Age` |
 
 `CORS` **panics at construction** when `AllowedOrigins` contains `*` and `AllowCredentials` is
 set. Apps with a custom header — Capsule's `X-Delete-Token` — extend `AllowedHeaders`.
+
+### Request ID
+
+| Symbol | Signature |
+|---|---|
+| `RequestID` | `RequestID(next http.Handler) http.Handler` |
+| `RequestIDFrom` | `RequestIDFrom(ctx context.Context) string` |
+| `RequestIDHeader` | `const = "X-Request-Id"` |
+| `MaxRequestIDLength` | `const = 128` |
+
+Accepts the caller's `X-Request-Id` when it is at most `MaxRequestIDLength` bytes of
+alphanumerics and `-_.:/ `, mints an opaque id when it is not, echoes the result on the response,
+and stores it under chi's context key so `GetReqID` keeps working.
+
+Accepting a caller's id is what makes a browser error reachable from the server logs: the
+`@facile/journal` SDK mints one before the request leaves the page, so a failed fetch can name
+the id the server logged it under. That makes a request id **a hint, never a credential** — it is
+caller-controlled by design, which is why it is bounded and charset-checked before it reaches a
+log line, and why nothing may authorize on it.
 
 ### Request logging
 

@@ -28,7 +28,9 @@ docker compose healthcheck ──▶ /app healthcheck ──▶ 127.0.0.1:$PORT/
 RequestID ──▶ Recoverer ──▶ RealIP ──▶ CORS ──▶ RequestLogger ──▶ your handler
 ```
 
-`RequestID` and `RealIP` come from `chi/v5/middleware`; the other three are tronc's.
+All five are tronc's. `RequestID` and `RealIP` replace chi's middleware of the same names:
+chi's `RealIP` believes `X-Forwarded-For` from any peer, and chi's `RequestID` takes
+`X-Request-Id` verbatim, never echoes it, and mints ids containing the container's hostname.
 CORS is applied only when `Config.CORS.AllowedOrigins` is non-empty, so an app with no
 configured origins runs one middleware fewer rather than an accept-nothing pass.
 
@@ -43,8 +45,13 @@ chain while still having a request ID to log with.
 
 ## Request lifecycle
 
-1. `RequestID` attaches an ID to the context; `middleware.Recoverer` and
-   `middleware.RequestLogger` both read it back with `chimiddleware.GetReqID`.
+1. `RequestID` accepts the caller's `X-Request-Id` when it is well formed — at most
+   `MaxRequestIDLength` bytes of alphanumerics and `-_.:/ ` — and mints an opaque one when it is
+   not. It echoes the result on the response and attaches it to the context; `middleware.Recoverer`
+   and `middleware.RequestLogger` read it back, and a handler reads it with
+   `middleware.RequestIDFrom` (or `chimiddleware.GetReqID` — the context key is chi's, so both
+   work). The echo is what lets a browser name the id its request was logged under; `CORS` exposes
+   the header so a script can actually read it.
 2. `Recoverer` arms its `defer`. A recovered panic is logged at error with the request ID,
    method, path, the panic value and a full stack, then answered through
    `httpjson.WriteError` as an `internal` error — the suite envelope, not chi's bare text 500,
