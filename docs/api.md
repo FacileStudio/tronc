@@ -114,6 +114,14 @@ case- and whitespace-insensitive, accepts `warning` as well as `warn`, and retur
 `CORS` **panics at construction** when `AllowedOrigins` contains `*` and `AllowCredentials` is
 set. Apps with a custom header — Capsule's `X-Delete-Token` — extend `AllowedHeaders`.
 
+**Extend the defaults, do not replace them.** Capsule writes
+`append(middleware.DefaultAllowedHeaders, "X-Delete-Token")`, which is why it inherited
+`X-Request-Id` for free when 0.14.0 added it. An app that assigns its own literal list instead
+silently drops `X-Request-Id`, and the failure is invisible: reads keep working, the browser
+simply never gets to send or read the id, so a client-side error can no longer name the request
+the server logged. The same applies to `ExposedHeaders` — a response header a script cannot read
+is the same as one never sent.
+
 ### Request ID
 
 | Symbol | Signature |
