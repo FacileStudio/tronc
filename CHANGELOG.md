@@ -4,6 +4,24 @@ All notable changes to `tronc` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow semver —
 while on `v0`, a breaking change bumps the minor.
 
+## [Unreleased]
+
+### Changed
+
+- **`docs/api.md` warns that replacing the CORS header lists silently drops `X-Request-Id`.**
+  Documentation only: no behaviour changed, no symbol moved.
+
+  0.14.0 put `X-Request-Id` in `DefaultAllowedHeaders` and in the default `ExposedHeaders`, so an
+  app that *extends* the defaults inherited the echo for free — Capsule writes
+  `append(middleware.DefaultAllowedHeaders, "X-Delete-Token")`, which is the only reason it did.
+  An app that assigns its own literal list instead loses the header with no error anywhere: reads
+  keep working, the browser simply never gets to send or read the id, so a client-side error can
+  no longer name the request the server logged. The same trap applies to `ExposedHeaders` — a
+  response header a script cannot read is the same as one never sent.
+
+  The warning already existed, in Journal's `CLAUDE.md`, where no other app author would ever read
+  it. It belongs beside the `CORS` contract it qualifies.
+
 ## [0.14.0] — 2026-08-17
 
 ### Added
