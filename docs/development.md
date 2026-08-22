@@ -21,10 +21,17 @@ so `git clone` and `go test ./...` is the whole setup.
 mise run check      # gofmt + vet + test + golangci-lint
 mise run test       # go test ./...
 mise run format     # rewrite Go sources in place
-mise run hooks      # enable the tracked pre-push gate in this clone
 ```
 
-`mise run hooks` is `git config core.hooksPath .githooks`. Run it once per clone.
+## Git hooks
+
+`mise install` wires the git hooks through lefthook, so a fresh clone needs nothing beyond
+the command it already runs to get the toolchain.
+
+Two hooks land. `commit-msg` enforces Conventional Commits and comes from the shared config
+in `FacileStudio/hooks`, pinned by tag in `lefthook.yml`, so the rule is identical across the
+suite and changes in one place. `pre-push` runs `scripts/check.sh`, the same gate as before
+and with the script unchanged.
 
 ## The quality gate
 
@@ -43,7 +50,8 @@ Two deliberate quirks worth knowing before you "simplify" it:
 
 - **It is not invoked through mise.** `mise run` resolves every tool in the merged config
   before running any task body, so one broken tool anywhere in your *global* mise config would
-  take the gate down with it. `.githooks/pre-push` therefore calls `scripts/check.sh` directly.
+  take the gate down with it. The lefthook `pre-push` job therefore calls `scripts/check.sh`
+  directly.
 - **It resolves the toolchain from `GOROOT`.** mise exports `GOROOT` for the pinned version but
   leaves an unrelated `go` earlier on `PATH` — Homebrew's, typically — and a `go` binary
   driving a different `GOROOT` fails with `compile: version "X" does not match go tool version
