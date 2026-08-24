@@ -420,7 +420,7 @@ Relative to the copies this replaces:
 [0.2.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.1.0
 
-## [0.14.0] — 2026-08-23
+## [0.15.0] — 2026-08-23
 
 ### Added
 
