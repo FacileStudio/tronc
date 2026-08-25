@@ -5,7 +5,7 @@ Local setup, the quality gate, CI, and how versions are cut and consumed.
 ## Prerequisites
 
 - **Go 1.24.** `go.mod` declares `go 1.24.0` and `mise.toml` pins the toolchain to `1.24`.
-  Consumers run newer — Jardin is on 1.26.1, Plume and Casier on 1.25.0 — but 1.24.0 is the
+  Consumers run newer — Mycelium is on 1.26.1, Plume and Casier on 1.25.0 — but 1.24.0 is the
   floor across the suite and the version CI builds with.
 - **mise**, for the task runner. Optional; every task is a one-line shell command you can run
   directly.
@@ -106,8 +106,8 @@ Add an `Unreleased` entry as part of the change, not after.
 
 The bar is that a behavior is already duplicated across consumers and has drifted, or that a
 consumer cannot adopt the chassis without it. `spa` was extracted from Courrier's
-`internal/spa`, `httpx.Chain` exists because Jardin does not use chi, and `LoadCoreWithout`
-exists because Jardin has no database. Nothing here was designed speculatively.
+`internal/spa`, `httpx.Chain` exists because Mycelium does not use chi, and `LoadCoreWithout`
+exists because Mycelium has no database. Nothing here was designed speculatively.
 
 The hard constraint: **no new dependencies.** `github.com/go-chi/chi/v5` is the only one, and
 that is a feature of the module, not an accident. Anything that would need a second one belongs

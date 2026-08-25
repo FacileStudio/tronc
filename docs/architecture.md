@@ -35,7 +35,7 @@ CORS is applied only when `Config.CORS.AllowedOrigins` is non-empty, so an app w
 configured origins runs one middleware fewer rather than an accept-nothing pass.
 
 `httpx.Chain` applies the identical stack to any `http.Handler`. It exists for the one Go app
-in the suite that does not route with chi — Jardin uses Go 1.22's `http.ServeMux` pattern
+in the suite that does not route with chi — Mycelium uses Go 1.22's `http.ServeMux` pattern
 matching — so it gets the same behavior without being rewritten onto a router it does not use.
 
 **`Recoverer` sits second, not innermost.** The copies being replaced run it last in the

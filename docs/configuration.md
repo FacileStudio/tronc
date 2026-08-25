@@ -20,7 +20,7 @@ adopting `env.LoadCore` in an app that already has its own configuration.
 | `JOURNAL_TOKEN` | no | *(none)* | Read into `Core.JournalToken` |
 
 `env.LoadCoreWithout` is the same call with `DATABASE_URL` read if present but not required.
-It exists for a service that has no database of its own — Jardin keeps its state as files, and
+It exists for a service that has no database of its own — Mycelium keeps its state as files, and
 requiring a database URL kept it off the shared configuration entirely.
 
 `APP_ENV` is parsed leniently: `prod` and `production` both mean production, `stage` and
