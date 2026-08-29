@@ -168,3 +168,115 @@ func TestUndocumentedNormalizesRegexParameters(t *testing.T) {
 		t.Errorf("regex-constrained parameter was not matched to its registry entry: %v", missing)
 	}
 }
+
+type CreateProjectInput struct {
+	Name        string `json:"name" validate:"required"`
+	Description string `json:"description,omitempty"`
+	Private     bool   `json:"private"`
+}
+
+type ProjectOutput struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt string    `json:"created_at"`
+}
+
+func TestOpenAPIReflectsStructSchemasAndComponents(t *testing.T) {
+	cfg := apiref.Config{
+		Title: "Reflect API",
+		Registry: apiref.Registry{
+			Modules: []apiref.Module{{
+				Name: "projects",
+				Routes: []apiref.Route{
+					{
+						Method:       "POST",
+						Path:         "/projects",
+						Summary:      "Create project",
+						QueryParams:  []apiref.Field{{Name: "notify", Type: "bool", Description: "Send notification"}},
+						RequestBody:  CreateProjectInput{},
+						ResponseBody: ProjectOutput{},
+						Status:       http.StatusCreated,
+					},
+					{
+						Method:  "DELETE",
+						Path:    "/projects/{id}",
+						Summary: "Delete project",
+						Status:  http.StatusNoContent,
+					},
+				},
+			}},
+		},
+	}
+
+	doc := apiref.OpenAPI(cfg)
+	components, ok := doc["components"].(map[string]any)
+	if !ok {
+		t.Fatal("components missing")
+	}
+	schemas, ok := components["schemas"].(map[string]any)
+	if !ok {
+		t.Fatal("schemas missing in components")
+	}
+
+	createSchema, ok := schemas["CreateProjectInput"].(map[string]any)
+	if !ok {
+		t.Fatal("CreateProjectInput schema missing")
+	}
+	props, ok := createSchema["properties"].(map[string]any)
+	if !ok || props["name"] == nil || props["description"] == nil || props["private"] == nil {
+		t.Errorf("properties in CreateProjectInput incomplete: %v", props)
+	}
+
+	paths := doc["paths"].(map[string]any)
+	postOp := paths["/projects"].(map[string]any)["post"].(map[string]any)
+	reqBody := postOp["requestBody"].(map[string]any)["content"].(map[string]any)["application/json"].(map[string]any)["schema"].(map[string]any)
+	if reqBody["$ref"] != "#/components/schemas/CreateProjectInput" {
+		t.Errorf("requestBody ref = %v, want #/components/schemas/CreateProjectInput", reqBody["$ref"])
+	}
+
+	resp201 := postOp["responses"].(map[string]any)["201"].(map[string]any)
+	respSchema := resp201["content"].(map[string]any)["application/json"].(map[string]any)["schema"].(map[string]any)
+	if respSchema["$ref"] != "#/components/schemas/ProjectOutput" {
+		t.Errorf("response ref = %v, want #/components/schemas/ProjectOutput", respSchema["$ref"])
+	}
+
+	deleteOp := paths["/projects/{id}"].(map[string]any)["delete"].(map[string]any)
+	resp204 := deleteOp["responses"].(map[string]any)["204"].(map[string]any)
+	if resp204["content"] != nil {
+		t.Errorf("204 response should not have content body: %v", resp204)
+	}
+}
+
+func TestIncompleteFindsThinOrMissingRouteDeclarations(t *testing.T) {
+	cfg := apiref.Config{
+		Title: "Test API",
+		Registry: apiref.Registry{
+			Modules: []apiref.Module{{
+				Name: "test",
+				Routes: []apiref.Route{
+					{
+						Method:  "POST",
+						Path:    "/empty-summary",
+						Summary: "",
+					},
+					{
+						Method:  "POST",
+						Path:    "/no-body",
+						Summary: "Has summary but no body",
+					},
+					{
+						Method:       "GET",
+						Path:         "/good",
+						Summary:      "Good route",
+						ResponseBody: "GoodResponse",
+					},
+				},
+			}},
+		},
+	}
+
+	issues := apiref.Incomplete(cfg)
+	if len(issues) < 2 {
+		t.Fatalf("Incomplete() = %v, want at least 2 issues", issues)
+	}
+}
