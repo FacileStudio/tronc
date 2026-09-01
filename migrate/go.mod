@@ -1,6 +1,6 @@
 module github.com/FacileStudio/tronc/migrate
 
-go 1.25.7
+go 1.26
 
 require github.com/pressly/goose/v3 v3.27.3
 
