@@ -99,6 +99,37 @@ func TestWriteErrorAlwaysEmitsTheEnvelope(t *testing.T) {
 	}
 }
 
+func TestWriteErrorCarriesTheUpgradeURLOnA402(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	WriteError(recorder, fmt.Errorf("gate: %w",
+		errors.PaymentRequired("this plan has no seats left").WithUpgradeURL("https://ardoise.facile.studio/billing")))
+
+	if recorder.Code != http.StatusPaymentRequired {
+		t.Errorf("status = %d, want 402", recorder.Code)
+	}
+	var body map[string]map[string]string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not JSON: %v", err)
+	}
+	want := map[string]string{
+		"code":        "payment_required",
+		"message":     "this plan has no seats left",
+		"upgrade_url": "https://ardoise.facile.studio/billing",
+	}
+	if fmt.Sprint(body["error"]) != fmt.Sprint(want) {
+		t.Errorf("envelope = %v, want %v", body["error"], want)
+	}
+}
+
+func TestWriteErrorOmitsAnEmptyUpgradeURL(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	WriteError(recorder, errors.PaymentRequired("upgrade").WithUpgradeURL("javascript:alert(1)"))
+
+	if strings.Contains(recorder.Body.String(), "upgrade_url") {
+		t.Errorf("an unsafe or empty upgrade_url reached the body: %s", recorder.Body.String())
+	}
+}
+
 func TestWriteErrorHidesTheUnderlyingCause(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	WriteError(recorder, fmt.Errorf("pq: password authentication failed for user %q", "sablier"))
