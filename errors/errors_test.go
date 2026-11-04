@@ -14,6 +14,7 @@ func TestStatusCoversEveryConstructor(t *testing.T) {
 	}{
 		"invalid_argument":    {Invalid("x"), http.StatusBadRequest},
 		"unauthenticated":     {Unauthorized("x"), http.StatusUnauthorized},
+		"payment_required":    {PaymentRequired("x"), http.StatusPaymentRequired},
 		"permission_denied":   {Forbidden("x"), http.StatusForbidden},
 		"not_found":           {NotFound("x"), http.StatusNotFound},
 		"already_exists":      {Conflict("x"), http.StatusConflict},
@@ -61,5 +62,30 @@ func TestUnwrapReachesTheCause(t *testing.T) {
 	}
 	if Status(wrapped) != http.StatusInternalServerError {
 		t.Error("Status did not unwrap")
+	}
+}
+
+func TestWithUpgradeURLKeepsOnlySafeLinks(t *testing.T) {
+	cases := map[string]bool{
+		"https://ardoise.facile.studio/billing?plan=pro": true,
+		"/settings/plan":                       true,
+		"":                                     false,
+		"http://ardoise.facile.studio/billing": false,
+		"javascript:alert(1)":                  false,
+		"//evil.example/billing":               false,
+		"/\\evil.example":                      false,
+		"https://user:pw@evil.example/":        false,
+		"https:///nohost":                      false,
+		"/settings\r\nSet-Cookie: x=1":         false,
+		"data:text/html,<script>":              false,
+	}
+	for raw, kept := range cases {
+		err := PaymentRequired("upgrade to use this").WithUpgradeURL(raw)
+		if got := err.UpgradeURL == raw && raw != ""; got != kept {
+			t.Errorf("WithUpgradeURL(%q) kept = %v, want %v", raw, got, kept)
+		}
+		if err.Code != "payment_required" {
+			t.Errorf("WithUpgradeURL changed the code to %s", err.Code)
+		}
 	}
 }
