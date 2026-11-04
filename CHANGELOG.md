@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-04
+
 ### Added
 
 - **Security headers on every response, on by default.** `httpx.NewRouter` and `httpx.Chain`
