@@ -25,10 +25,13 @@ docker compose healthcheck ──▶ /app healthcheck ──▶ 127.0.0.1:$PORT/
 `httpx.NewRouter` applies the standard stack in this order, outermost first:
 
 ```
-RequestID ──▶ Recoverer ──▶ RealIP ──▶ CORS ──▶ RequestLogger ──▶ your handler
+RequestID ──▶ Recoverer ──▶ SecurityHeaders ──▶ RealIP ──▶ CORS ──▶ RequestLogger ──▶ your handler
 ```
 
-All five are tronc's. `RequestID` and `RealIP` replace chi's middleware of the same names:
+All six are tronc's. `SecurityHeaders` sits outside `RealIP` because it sends HSTS only when
+the connection is TLS or a trusted peer says `X-Forwarded-Proto: https`, and `RealIP` replaces
+the peer address with the visitor's. It sets each header before the handler runs, so a handler
+that calls `Header().Set` on one of them wins. `RequestID` and `RealIP` replace chi's middleware of the same names:
 chi's `RealIP` believes `X-Forwarded-For` from any peer, and chi's `RequestID` takes
 `X-Request-Id` verbatim, never echoes it, and mints ids containing the container's hostname.
 CORS is applied only when `Config.CORS.AllowedOrigins` is non-empty, so an app with no
