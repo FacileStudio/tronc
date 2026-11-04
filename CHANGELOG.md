@@ -35,13 +35,15 @@ while on `v0`, a breaking change bumps the minor.
 - **`middleware.SecurityOverride(SecurityOverrideConfig)`** extends the chassis headers on one
   route, for an embed that must be framed or a page that needs the camera. It reads the outer
   CSP back and writes into the same headers, so the route keeps the app's mode, script hashes
-  and `report-uri`. Mode changes only through `CSPEnforce *bool`, and only upward: a route can
+  and `report-uri`. Only the first value of each CSP header is extended; a value another
+  middleware added is kept as it is. Mode changes only through `CSPEnforce *bool`, and only upward: a route can
   promote report-only to enforced, never downgrade.
 
 - **`spa.InlineScriptHashes`** returns a `'sha256-...'` source for every inline script in the
   built client. adapter-static writes two (the bootstrap, which changes every build, and
   `app.html`'s own), and `script-src 'self'` blocks both. Attributes are read the way the HTML
-  tokenizer reads them, so a quoted `>` or `src=` cannot mis-hash. Checked against Nuage's build
+  tokenizer reads them, so a quoted `>` or `src=` cannot mis-hash, and folds case for ASCII
+  only, so byte offsets stay exact whatever runes the page holds. Checked against Nuage's build
   in headless Chromium: with the hashes the client boots under an enforced CSP, without them
   Chromium blocks both scripts and names the same two hashes.
 
