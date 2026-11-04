@@ -87,25 +87,34 @@ func (o *securityOverride) apply(header http.Header) {
 
 // applyCSP extends the full policy, which is the report-only one while the
 // app has not enforced, and the minimal enforced one only in the directives
-// it already has.
+// it already has. Only the first value of each header is the chassis's; any
+// further value another middleware added is kept as it is.
 func (o *securityOverride) applyCSP(header http.Header) {
-	enforced, reportOnly := header.Get(HeaderCSP), header.Get(HeaderCSPReportOnly)
-	if reportOnly == "" {
-		if enforced != "" {
-			header.Set(HeaderCSP, renderPolicy(extendDirectives(parsePolicy(enforced), o.sources, true)))
-		}
+	enforced, reportOnly := header.Values(HeaderCSP), header.Values(HeaderCSPReportOnly)
+	if len(reportOnly) == 0 {
+		o.extendFirst(header, HeaderCSP, enforced, true)
 		return
 	}
-	full := renderPolicy(extendDirectives(parsePolicy(reportOnly), o.sources, true))
-	if o.enforce {
+	full := renderPolicy(extendDirectives(parsePolicy(reportOnly[0]), o.sources, true))
+	if !o.enforce {
+		header[HeaderCSPReportOnly] = append([]string{full}, reportOnly[1:]...)
+		o.extendFirst(header, HeaderCSP, enforced, false)
+		return
+	}
+	if len(reportOnly) == 1 {
 		header.Del(HeaderCSPReportOnly)
-		header.Set(HeaderCSP, full)
+	} else {
+		header[HeaderCSPReportOnly] = slices.Clone(reportOnly[1:])
+	}
+	header[HeaderCSP] = append([]string{full}, enforced[min(1, len(enforced)):]...)
+}
+
+func (o *securityOverride) extendFirst(header http.Header, key string, values []string, addNew bool) {
+	if len(values) == 0 {
 		return
 	}
-	header.Set(HeaderCSPReportOnly, full)
-	if enforced != "" {
-		header.Set(HeaderCSP, renderPolicy(extendDirectives(parsePolicy(enforced), o.sources, false)))
-	}
+	first := renderPolicy(extendDirectives(parsePolicy(values[0]), o.sources, addNew))
+	header[key] = append([]string{first}, values[1:]...)
 }
 
 // parsePolicy reads a policy back into directives, so an override can extend
