@@ -10,9 +10,12 @@ today.
 
 ## What it does
 
-- Assembles the standard chi middleware chain — request ID, panic recovery, real IP, CORS,
-  request logging — in one call
-- Carries the suite error envelope, `{"error":{"code","message"}}`, and its one code-to-status map
+- Assembles the standard chi middleware chain — request ID, panic recovery, security headers,
+  real IP, CORS, request logging — in one call
+- Sends HSTS, a CSP (report-only until the app enforces it), `nosniff`, a Referrer-Policy, a
+  Permissions-Policy and COOP on every response, with per-app and per-route overrides
+- Carries the suite error envelope, `{"error":{"code","message"}}`, and its one code-to-status
+  map, including `payment_required` (402) with an optional `upgrade_url`
 - Decodes JSON and gzipped JSON request bodies under explicit size caps, rejecting unknown fields
 - Logs one structured record per request with credential-bearing query parameters redacted
 - Serves `/health` and `/ready` at both the root and `/api`, plus an argv healthcheck hook for
@@ -83,6 +86,24 @@ func main() {
 }
 ```
 
+Security headers are on without any configuration, with the CSP in report-only mode. A
+SvelteKit client served by the same binary needs its inline scripts hashed before the CSP is
+enforced:
+
+```go
+hashes, err := spa.InlineScriptHashes(spa.DirFromEnv())
+// handle err
+router := httpx.NewRouter(httpx.Config{
+	Logger: log,
+	Security: middleware.SecurityConfig{
+		CSPSources: map[string][]string{"script-src": hashes},
+	},
+})
+```
+
+Set `CSPEnforce: true` once a release shows no `[Report Only]` violation in the browser console.
+Options, per-route overrides and the rollout: [docs/api.md](docs/api.md#security-headers).
+
 Consumers conventionally import the configuration package as `troncenv` and embed
 `troncenv.Core` in their own config struct.
 
@@ -108,7 +129,7 @@ Full reference, including the six fallback names for the origin list and the tra
 errors/       the error envelope and its code-to-status map
 httpjson/     bounded, strict JSON decoding; WriteJSON and WriteError
 logger/       slog JSON on stdout, with a Wrap seam for log shipping
-middleware/   RequestLogger, CORS, Recoverer
+middleware/   RequestLogger, CORS, Recoverer, SecurityHeaders
 httpx/        NewRouter and Chain — the standard middleware stack
 health/       /health and /ready, mounted at the root and under /api
 healthcheck/  an argv hook so a distroless container can probe itself

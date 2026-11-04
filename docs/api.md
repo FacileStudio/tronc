@@ -12,13 +12,15 @@ wrapped cause.
 
 ```go
 type Error struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Cause   error  `json:"-"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	UpgradeURL string `json:"upgrade_url,omitempty"`
+	Cause      error  `json:"-"`
 }
 
-func (e *Error) Error() string   // returns Message
-func (e *Error) Unwrap() error   // returns Cause, so errors.Is/As reach it
+func (e *Error) Error() string                     // returns Message
+func (e *Error) Unwrap() error                     // returns Cause, so errors.Is/As reach it
+func (e *Error) WithUpgradeURL(rawURL string) *Error // sets UpgradeURL, returns e
 ```
 
 `Cause` is `json:"-"`, so it never crosses the wire.
@@ -27,6 +29,7 @@ func (e *Error) Unwrap() error   // returns Cause, so errors.Is/As reach it
 |---|---|---|
 | `Invalid(message string) *Error` | `invalid_argument` | 400 |
 | `Unauthorized(message string) *Error` | `unauthenticated` | 401 |
+| `PaymentRequired(message string) *Error` | `payment_required` | 402 |
 | `Forbidden(message string) *Error` | `permission_denied` | 403 |
 | `NotFound(message string) *Error` | `not_found` | 404 |
 | `NotAllowed(message string) *Error` | `method_not_allowed` | 405 |
@@ -39,6 +42,17 @@ func (e *Error) Unwrap() error   // returns Cause, so errors.Is/As reach it
 
 `Internal` is the only constructor that takes a cause; the rest pass `nil`. Use
 `New(code, message string, cause error) *Error` to attach a cause to any other code.
+
+`PaymentRequired` is for a feature or quota the caller's plan does not include. Attach where to
+upgrade with `WithUpgradeURL`, and `httpjson.WriteError` adds it to the envelope:
+
+```json
+{"error":{"code":"payment_required","message":"this plan has no seats left","upgrade_url":"https://ardoise.facile.studio/billing"}}
+```
+
+`WithUpgradeURL` keeps only a same-origin path (`/settings/plan`) or an absolute `https` URL with
+a host and no credentials. Anything else (`javascript:`, `//evil.example`, `http:`, a control
+character) leaves the field empty and the key absent, because a client renders it as a link.
 
 `Status(err error) int` maps an error onto its HTTP status. Anything that is not an
 `*errors.Error` — checked with `errors.As`, so a wrapped one still resolves — and any
@@ -74,7 +88,7 @@ expand without limit, so bounding only the request is a decompression bomb.
 
 `WriteJSON` sets `Content-Type: application/json` and the given status; a `nil` value writes
 the status with no body. `WriteError` writes `{"error":{"code":...,"message":...}}` at the
-status the code maps to, and turns anything that is not an `*errors.Error` into a generic
+status the code maps to, adds `upgrade_url` when the error carries one, and turns anything that is not an `*errors.Error` into a generic
 `internal`, so a raw driver failure can never leak its text to a client.
 
 ## `logger`
@@ -121,6 +135,103 @@ silently drops `X-Request-Id`, and the failure is invisible: reads keep working,
 simply never gets to send or read the id, so a client-side error can no longer name the request
 the server logged. The same applies to `ExposedHeaders` — a response header a script cannot read
 is the same as one never sent.
+
+### Security headers
+
+```go
+func SecurityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler
+func SecurityOverride(cfg SecurityConfig) func(http.Handler) http.Handler
+func BuildCSP(extra map[string][]string, reportURI string) (string, error)
+func IsHTTPS(request *http.Request, trusted []netip.Prefix) bool
+```
+
+`httpx` mounts `SecurityHeaders(Config.Security)` on every app. The zero `SecurityConfig` sends:
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy-Report-Only` | `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`, only when `IsHTTPS` |
+
+| `SecurityConfig` field | Type | Default | Notes |
+|---|---|---|---|
+| `CSPEnforce` | `bool` | `false` | `false` sends the policy as `Content-Security-Policy-Report-Only` |
+| `CSPSources` | `map[string][]string` | — | Extra sources per directive. Extends the default, replaces a `'none'` default, appends a directive the default lacks (`frame-src`, `media-src`, `font-src`, `worker-src`) in name order |
+| `CSPReportURI` | `string` | — | Appends `report-uri` |
+| `Allow` | `[]string` | — | Permissions-Policy features granted to `(self)` |
+| `CrossOriginOpenerPolicy` | `string` | `same-origin` | Also `same-origin-allow-popups`, `noopener-allow-popups`, `unsafe-none` |
+| `Trusted` | `[]netip.Prefix` | the router's trusted proxies, filled by `httpx` | Peers whose `X-Forwarded-Proto` is believed; nil trusts none |
+
+`IsHTTPS` is true when the connection is TLS, or when the peer is in `trusted` and the rightmost
+`X-Forwarded-Proto` value, the one the nearest proxy wrote, is `https`. Plain HTTP in local
+development gets no HSTS.
+
+`style-src` carries `'unsafe-inline'` on purpose: Svelte transitions and SvelteKit's markup write
+inline styles, and a style cannot run code. `script-src` does not.
+
+`connect-src 'self'` covers same-origin `ws:` and `wss:` in current browsers, so a WebSocket or
+SSE endpoint on the app's own host needs nothing. A different host (LiveKit) needs its origin.
+
+**A handler wins.** Each header is set before the handler runs and only when nothing upstream
+set it, so `w.Header().Set(...)` in a handler replaces it and `w.Header().Del(...)` removes it.
+Use `Set`, not `Add`: two CSP headers are both enforced, so an added one narrows, never widens.
+
+**Per route**, mount `SecurityOverride` on the route or group. It replaces every header the
+chassis set with the ones its config describes, and drops the CSP header of the other mode:
+
+```go
+embed := appSecurity
+embed.CSPSources = map[string][]string{
+	"script-src":      hashes,
+	"frame-ancestors": {"https://ardoise.facile.studio"},
+}
+router.With(middleware.SecurityOverride(embed)).Get("/embed/{id}", handler)
+```
+
+The override's config is the whole policy for that route, not a delta: repeat every source the
+page still needs, such as the inline script hashes. Build a fresh map rather than writing into
+the app's.
+
+`SecurityHeaders` and `SecurityOverride` **panic at construction**, and `BuildCSP` returns an
+error, on a source containing `;`, `,`, whitespace or a control character, a directive or
+feature name outside `[a-z-]`, or an unknown COOP value. Each of those would inject a directive or split the header.
+
+**SvelteKit's inline scripts.** adapter-static writes two inline scripts into `index.html`: the
+bootstrap that imports the entry chunks, whose content changes on every build, and anything
+`app.html` carries, such as a theme script. `script-src 'self'` blocks both, and the page stays
+blank. Pass their hashes:
+
+```go
+hashes, err := spa.InlineScriptHashes(clientDir)
+cfg.Security.CSPSources = map[string][]string{"script-src": hashes}
+```
+
+Hashes, not nonces, and computed by the server, not by `kit.csp`:
+
+- A nonce needs the HTML rewritten per request, and SvelteKit forbids nonces on prerendered
+  pages. The built files are static; a hash fits them and keeps them cacheable.
+- `kit.csp` hashes only the scripts SvelteKit generates, not the ones in `app.html`, and
+  delivers the policy in a `<meta>` tag, where `frame-ancestors` and `report-uri` are ignored
+  (https://svelte.dev/docs/kit/configuration#csp). A header CSP and a meta CSP are both
+  enforced, so the header must allow the scripts anyway.
+
+Checked against Nuage's real build in headless Chromium: with the hashes and `CSPEnforce: true`
+the client boots with no violation; without them Chromium blocks both scripts and names the
+same two hashes. An adapter-node client renders its HTML in Node, so the chassis headers never
+reach those pages: configure `kit.csp` with `mode: 'auto'` there.
+
+**Staged rollout.** Every app starts in report-only, which is the default:
+
+1. Upgrade. Add `CSPSources` for what the app loads (inline script hashes, LiveKit, an embed
+   parent). Optionally point `CSPReportURI` at a collector.
+2. Deploy and use every screen. Read the browser console, or the reports, for `[Report Only]`
+   violations. Fix each by adding the source or changing the code.
+3. When a release shows no violation, set `CSPEnforce: true`.
+
+The other headers are enforced from the first deploy.
 
 ### Request ID
 
@@ -213,15 +324,17 @@ ID, method, path, panic value and full stack. `http.ErrAbortHandler` is re-panic
 
 ```go
 type Config struct {
-	Logger *slog.Logger            // defaults to slog.Default()
-	CORS   middleware.CORSConfig   // applied only when AllowedOrigins is non-empty
+	Logger   *slog.Logger              // defaults to slog.Default()
+	CORS     middleware.CORSConfig     // applied only when AllowedOrigins is non-empty
+	Security middleware.SecurityConfig // always applied; the zero value is the default policy
 }
 
 func NewRouter(cfg Config) *chi.Mux
 func Chain(cfg Config, next http.Handler) http.Handler
 ```
 
-Both apply `RequestID → Recoverer → RealIP → CORS → RequestLogger`, outermost first.
+Both apply `RequestID → Recoverer → SecurityHeaders → RealIP → CORS → RequestLogger`,
+outermost first. `Security.Trusted` defaults to the router's trusted proxies.
 `NewRouter` returns a chi router to build on; `Chain` wraps any `http.Handler`, for an app that
 routes with something other than chi.
 
@@ -280,7 +393,13 @@ type Config struct {
 func Handler(cfg Config) http.Handler
 func DirFromEnv() string
 func Available(dir string) bool
+func InlineScriptHashes(dir string) ([]string, error)
 ```
+
+`InlineScriptHashes` walks `dir` for `.html` files and returns a sorted, deduplicated
+`'sha256-...'` source for each inline `<script>` without a `src`, after the CRLF normalisation
+the browser applies before hashing. Pass it as the `script-src` entry of
+`SecurityConfig.CSPSources`; see [Security headers](#security-headers).
 
 `Handler` serves static files from `cfg.Dir` and falls back to the index document for anything
 that does not resolve. In order, per request:
@@ -410,6 +529,12 @@ cannot change every suite app's page without a commit. That is one remote reques
 developer-facing page, but it does mean `/docs` renders blank on an air-gapped deployment.
 Set `Config.ScriptURL` to a locally served copy where that matters. Nothing else in tronc
 reaches the network.
+
+The page replaces the chassis CSP with the default policy plus the bundle's origin in
+`script-src` and `ScalarFontOrigin` (`https://fonts.scalar.com`) in `font-src`, in whichever
+mode the app runs, so `/docs` keeps rendering once an app enforces. It adds no CSP when the app
+sent none. Scalar's calls to `api.scalar.com` (its public API registry) stay blocked by
+`connect-src`; the reference renders without them.
 
 ## `migrate`
 
