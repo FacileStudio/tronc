@@ -59,3 +59,21 @@ func TestInlineScriptHashesReportsAMissingDir(t *testing.T) {
 		t.Error("a missing directory returned no error")
 	}
 }
+
+func TestInlineScriptHashesReadsAttributesLikeTheTokenizer(t *testing.T) {
+	cases := map[string][]string{
+		`<script data-x="a>b">run()</script>`:                      {sourceFor("run()")},
+		`<script data-note='src=/x.js' async>run()</script>`:       {sourceFor("run()")},
+		`<script data-x="a>b" src="/x.js">ignored()</script>`:      nil,
+		`<script SRC=/x.js>ignored()</script>`:                     nil,
+		`<scripty>no()</scripty><script>s="</scripts>";</script >`: {sourceFor(`s="</scripts>";`)},
+		`<script type=module>a()</script><script>b()</SCRIPT>`:     {sourceFor("a()"), sourceFor("b()")},
+		`<script data-x="never closed>run()</script>`:              nil,
+		`<script>unterminated()`:                                   nil,
+	}
+	for page, want := range cases {
+		if got := hashInlineScripts(page); !slices.Equal(got, want) {
+			t.Errorf("hashInlineScripts(%q) = %v, want %v", page, got, want)
+		}
+	}
+}
