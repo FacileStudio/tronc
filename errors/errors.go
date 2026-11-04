@@ -37,14 +37,16 @@ func (e *Error) Unwrap() error {
 // javascript: or protocol-relative URL, leaves the field empty, because a
 // client renders it as a link.
 func (e *Error) WithUpgradeURL(rawURL string) *Error {
-	if safeUpgradeURL(rawURL) {
+	if SafeUpgradeURL(rawURL) {
 		e.UpgradeURL = rawURL
 	}
 	return e
 }
 
-// safeUpgradeURL accepts a same-origin path or an https URL with a host.
-func safeUpgradeURL(rawURL string) bool {
+// SafeUpgradeURL reports whether rawURL is a same-origin path or an https URL
+// with a host and no credentials. httpjson.WriteError checks it again, so an
+// UpgradeURL assigned directly cannot bypass it.
+func SafeUpgradeURL(rawURL string) bool {
 	if rawURL == "" || strings.ContainsFunc(rawURL, unicode.IsControl) || strings.ContainsAny(rawURL, " \\") {
 		return false
 	}

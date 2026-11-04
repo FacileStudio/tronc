@@ -130,6 +130,17 @@ func TestWriteErrorOmitsAnEmptyUpgradeURL(t *testing.T) {
 	}
 }
 
+func TestWriteErrorSanitisesADirectlySetUpgradeURL(t *testing.T) {
+	appErr := errors.PaymentRequired("upgrade")
+	appErr.UpgradeURL = "javascript:alert(1)"
+	recorder := httptest.NewRecorder()
+	WriteError(recorder, appErr)
+
+	if strings.Contains(recorder.Body.String(), "upgrade_url") {
+		t.Errorf("a directly set unsafe upgrade_url reached the body: %s", recorder.Body.String())
+	}
+}
+
 func TestWriteErrorHidesTheUnderlyingCause(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	WriteError(recorder, fmt.Errorf("pq: password authentication failed for user %q", "sablier"))
