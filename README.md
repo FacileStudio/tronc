@@ -12,8 +12,9 @@ today.
 
 - Assembles the standard chi middleware chain — request ID, panic recovery, security headers,
   real IP, CORS, request logging — in one call
-- Sends HSTS, a CSP (report-only until the app enforces it), `nosniff`, a Referrer-Policy, a
-  Permissions-Policy and COOP on every response, with per-app and per-route overrides
+- Sends HSTS, a CSP (report-only until the app enforces it, with framing blocked from day one),
+  `X-Frame-Options`, `nosniff`, a Referrer-Policy, a Permissions-Policy and COOP on every
+  response, with per-app options and per-route overrides that extend them
 - Carries the suite error envelope, `{"error":{"code","message"}}`, and its one code-to-status
   map, including `payment_required` (402) with an optional `upgrade_url`
 - Decodes JSON and gzipped JSON request bodies under explicit size caps, rejecting unknown fields
