@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -42,26 +41,36 @@ func defaultCSP() []cspDirective {
 // the default lacks is appended in name order. It refuses a directive name or
 // source that would inject a directive or split the header.
 func BuildCSP(extra map[string][]string, reportURI string) (string, error) {
-	if err := validateCSP(extra, reportURI); err != nil {
+	directives, err := buildDirectives(extra, reportURI)
+	if err != nil {
 		return "", err
 	}
+	return renderPolicy(directives), nil
+}
 
-	defaults := defaultCSP()
-	parts := make([]string, 0, len(defaults)+len(extra)+1)
-	known := make(map[string]bool, len(defaults))
-	for _, directive := range defaults {
-		known[directive.name] = true
-		parts = append(parts, renderDirective(directive.name, mergeSources(directive.sources, extra[directive.name])))
+func buildDirectives(extra map[string][]string, reportURI string) ([]cspDirective, error) {
+	if err := validateCSP(extra, reportURI); err != nil {
+		return nil, err
 	}
-	for _, name := range slices.Sorted(maps.Keys(extra)) {
-		if !known[name] {
-			parts = append(parts, renderDirective(name, mergeSources(nil, extra[name])))
+	directives := extendDirectives(defaultCSP(), extra, true)
+	if reportURI != "" {
+		directives = append(directives, cspDirective{"report-uri", []string{reportURI}})
+	}
+	return directives, nil
+}
+
+// framingPolicy picks out of a full policy the minimal one enforced even in
+// report-only mode, so framing, plugins and base-tag hijacks are blocked from
+// the first deploy while the full policy is still being tuned.
+func framingPolicy(directives []cspDirective) []cspDirective {
+	names := []string{"frame-ancestors", "object-src", "base-uri"}
+	picked := make([]cspDirective, 0, len(names))
+	for _, name := range names {
+		if index := slices.IndexFunc(directives, func(d cspDirective) bool { return d.name == name }); index >= 0 {
+			picked = append(picked, directives[index])
 		}
 	}
-	if reportURI != "" {
-		parts = append(parts, "report-uri "+reportURI)
-	}
-	return strings.Join(parts, "; "), nil
+	return picked
 }
 
 func validateCSP(extra map[string][]string, reportURI string) error {
@@ -85,6 +94,33 @@ func validSource(source string) bool {
 	return source != "" && !strings.ContainsAny(source, ";, \t\r\n") && !strings.ContainsFunc(source, unicode.IsControl)
 }
 
+// extendDirectives merges extra into directives. A directive extra names but
+// directives lacks is appended in name order only when addNew is set, which
+// keeps the minimal framing policy from growing a script-src that would
+// enforce what the full policy only reports.
+func extendDirectives(directives []cspDirective, extra map[string][]string, addNew bool) []cspDirective {
+	merged := make([]cspDirective, 0, len(directives)+len(extra))
+	known := make(map[string]bool, len(directives))
+	for _, directive := range directives {
+		known[directive.name] = true
+		merged = append(merged, cspDirective{directive.name, mergeSources(directive.sources, extra[directive.name])})
+	}
+	if !addNew {
+		return merged
+	}
+	added := make([]string, 0, len(extra))
+	for name := range extra {
+		if !known[name] {
+			added = append(added, name)
+		}
+	}
+	slices.Sort(added)
+	for _, name := range added {
+		merged = append(merged, cspDirective{name, mergeSources(nil, extra[name])})
+	}
+	return merged
+}
+
 func mergeSources(defaults, extra []string) []string {
 	if len(extra) == 0 {
 		return defaults
@@ -99,43 +135,4 @@ func mergeSources(defaults, extra []string) []string {
 		}
 	}
 	return merged
-}
-
-func renderDirective(name string, sources []string) string {
-	if len(sources) == 0 {
-		return name
-	}
-	return name + " " + strings.Join(sources, " ")
-}
-
-func openerPolicy(value string) (string, error) {
-	if value == "" {
-		return "same-origin", nil
-	}
-	allowed := []string{"same-origin", "same-origin-allow-popups", "noopener-allow-popups", "unsafe-none"}
-	if !slices.Contains(allowed, value) {
-		return "", fmt.Errorf("tronc/middleware: Cross-Origin-Opener-Policy %q is not one of %v", value, allowed)
-	}
-	return value, nil
-}
-
-func permissionsPolicy(allow []string) (string, error) {
-	features := []string{"camera", "microphone", "geolocation"}
-	for _, feature := range allow {
-		if !tokenName.MatchString(feature) {
-			return "", fmt.Errorf("tronc/middleware: Permissions-Policy feature %q is not a feature name", feature)
-		}
-		if !slices.Contains(features, feature) {
-			features = append(features, feature)
-		}
-	}
-	parts := make([]string, 0, len(features))
-	for _, feature := range features {
-		value := "()"
-		if slices.Contains(allow, feature) {
-			value = "(self)"
-		}
-		parts = append(parts, feature+"="+value)
-	}
-	return strings.Join(parts, ", "), nil
 }
