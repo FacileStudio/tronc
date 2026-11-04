@@ -14,7 +14,7 @@ type scriptElement struct {
 // the HTML tokenizer does, so a quoted value holding ">" or "src=" cannot end
 // the tag early or pass for a src attribute.
 func scanScripts(page string) []scriptElement {
-	lower := strings.ToLower(page)
+	lower := asciiLower(page)
 	var found []scriptElement
 	for offset := 0; ; {
 		start := strings.Index(lower[offset:], "<script")
@@ -53,7 +53,7 @@ func scanAttributes(page string, i int) ([]string, int, bool) {
 			for end < len(page) && !isTagBoundary(page[end]) && page[end] != '=' {
 				end++
 			}
-			names = append(names, strings.ToLower(page[i:end]))
+			names = append(names, asciiLower(page[i:end]))
 			i = skipValue(page, end)
 		}
 	}

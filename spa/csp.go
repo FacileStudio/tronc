@@ -64,3 +64,17 @@ func hashInlineScripts(page string) []string {
 	}
 	return hashes
 }
+
+// asciiLower folds A-Z only, as the HTML tokenizer does, and keeps every byte
+// offset: strings.ToLower resizes some runes (U+023A grows, U+212A and U+0130
+// shrink), and indices found in its result would slice the wrong bytes of
+// page, or past its end.
+func asciiLower(value string) string {
+	folded := []byte(value)
+	for i, c := range folded {
+		if 'A' <= c && c <= 'Z' {
+			folded[i] = c + 'a' - 'A'
+		}
+	}
+	return string(folded)
+}

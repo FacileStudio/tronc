@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -75,5 +76,34 @@ func TestInlineScriptHashesReadsAttributesLikeTheTokenizer(t *testing.T) {
 		if got := hashInlineScripts(page); !slices.Equal(got, want) {
 			t.Errorf("hashInlineScripts(%q) = %v, want %v", page, got, want)
 		}
+	}
+}
+
+func TestInlineScriptHashesKeepsOffsetsAcrossCaseChangingRunes(t *testing.T) {
+	cases := map[string]string{
+		"U+023A grows under ToLower":    strings.Repeat("\u023a", 300),
+		"U+212A Kelvin shrinks":         "\u212a",
+		"U+0130 dotted I shrinks":       "\u0130",
+		"shrinking runes before a lure": strings.Repeat("\u0130\u212a", 40) + "<p>steal(document.cookie)</p>",
+	}
+	for name, prefix := range cases {
+		if len(strings.ToLower(prefix)) == len(prefix) {
+			t.Fatalf("%s: the prefix no longer changes length under ToLower, so it tests nothing", name)
+		}
+		page := "<html><body>" + prefix + "<SCRIPT data-x=\"\u023a>\u0130\">ok()</SCRIPT>" + prefix + "</body></html>"
+		if got := hashInlineScripts(page); !slices.Equal(got, []string{sourceFor("ok()")}) {
+			t.Errorf("%s: hashes = %v, want only the script's text", name, got)
+		}
+	}
+}
+
+func TestAsciiLowerKeepsEveryByte(t *testing.T) {
+	for _, value := range []string{"\u023a\u212a\u0130<SCRIPT>", "\xff\xfe<Script>", ""} {
+		if got := asciiLower(value); len(got) != len(value) {
+			t.Errorf("asciiLower(%q) changed length %d -> %d", value, len(value), len(got))
+		}
+	}
+	if got := asciiLower("\u023a\u212a<SCRIPT Src>"); got != "\u023a\u212a<script src>" {
+		t.Errorf("asciiLower folded more than A-Z: %q", got)
 	}
 }
