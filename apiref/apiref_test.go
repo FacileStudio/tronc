@@ -176,9 +176,9 @@ type CreateProjectInput struct {
 }
 
 type ProjectOutput struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt string    `json:"created_at"`
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
 }
 
 func TestOpenAPIReflectsStructSchemasAndComponents(t *testing.T) {
