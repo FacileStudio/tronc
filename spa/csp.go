@@ -6,14 +6,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
-)
-
-var (
-	inlineScript = regexp.MustCompile(`(?is)<script\b([^>]*)>(.*?)</script\s*>`)
-	srcAttribute = regexp.MustCompile(`(?i)(^|\s)src\s*=`)
 )
 
 // InlineScriptHashes returns a CSP source, 'sha256-...', for every inline
@@ -61,11 +55,11 @@ func InlineScriptHashes(dir string) ([]string, error) {
 func hashInlineScripts(page string) []string {
 	page = strings.ReplaceAll(strings.ReplaceAll(page, "\r\n", "\n"), "\r", "\n")
 	var hashes []string
-	for _, match := range inlineScript.FindAllStringSubmatch(page, -1) {
-		if srcAttribute.MatchString(match[1]) || match[2] == "" {
+	for _, script := range scanScripts(page) {
+		if !script.inline() {
 			continue
 		}
-		sum := sha256.Sum256([]byte(match[2]))
+		sum := sha256.Sum256([]byte(script.text))
 		hashes = append(hashes, "'sha256-"+base64.StdEncoding.EncodeToString(sum[:])+"'")
 	}
 	return hashes
