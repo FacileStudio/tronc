@@ -15,6 +15,9 @@ while on `v0`, a breaking change bumps the minor.
   - `Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none';
     frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:;
     connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'`
+  - `Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'`,
+    **enforced** while the full policy only reports, so framing is blocked from the first deploy
+  - `X-Frame-Options: DENY`, unless the app opens `frame-ancestors`
   - `X-Content-Type-Options: nosniff`
   - `Referrer-Policy: strict-origin-when-cross-origin`
   - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
@@ -24,60 +27,69 @@ while on `v0`, a breaking change bumps the minor.
     `TrustedProxies`, so a client cannot claim HTTPS by setting the header itself.
 
   `httpx.Config.Security` (`middleware.SecurityConfig`) extends it: `CSPEnforce`, `CSPSources`
-  per directive, `CSPReportURI`, `Allow` for Permissions-Policy features, and
-  `CrossOriginOpenerPolicy`. `middleware.SecurityOverride` replaces the headers on one route,
-  for an embed that must be framed. Each header is set before the handler runs and only if
-  nothing upstream set it, so a handler's `Header().Set` wins. A source that would inject a
-  directive or split the header panics at startup, the same stance `CORS` takes.
+  per directive, `CSPReportURI`, `Allow` for Permissions-Policy features,
+  `CrossOriginOpenerPolicy` and `HSTSExcludeSubdomains`. Each header is set before the handler
+  runs and only if nothing upstream set it, so a handler's `Header().Set` wins. A source that
+  would inject a directive or split the header panics at startup, the same stance `CORS` takes.
+
+- **`middleware.SecurityOverride(SecurityOverrideConfig)`** extends the chassis headers on one
+  route, for an embed that must be framed or a page that needs the camera. It reads the outer
+  CSP back and writes into the same headers, so the route keeps the app's mode, script hashes
+  and `report-uri`. Mode changes only through `CSPEnforce *bool`, and only upward: a route can
+  promote report-only to enforced, never downgrade.
 
 - **`spa.InlineScriptHashes`** returns a `'sha256-...'` source for every inline script in the
   built client. adapter-static writes two (the bootstrap, which changes every build, and
-  `app.html`'s own), and `script-src 'self'` blocks both. Checked against Nuage's build in
-  headless Chromium: with the hashes the client boots under an enforced CSP, without them
+  `app.html`'s own), and `script-src 'self'` blocks both. Attributes are read the way the HTML
+  tokenizer reads them, so a quoted `>` or `src=` cannot mis-hash. Checked against Nuage's build
+  in headless Chromium: with the hashes the client boots under an enforced CSP, without them
   Chromium blocks both scripts and names the same two hashes.
 
 - **`errors.PaymentRequired`**, code `payment_required`, HTTP 402, for a feature or quota the
   caller's plan does not include. `(*Error).WithUpgradeURL` attaches where to upgrade, and
-  `httpjson.WriteError` adds it to the envelope as `upgrade_url` when set. Only a same-origin
-  path or an `https` URL with a host and no credentials is kept; `javascript:`,
-  protocol-relative and `http:` values leave the field empty.
+  `httpjson.WriteError` adds it to the envelope as `upgrade_url`. `errors.SafeUpgradeURL` keeps
+  only a same-origin path or an `https` URL with a host and no credentials, and `WriteError`
+  checks it again, so an `UpgradeURL` assigned directly cannot bypass it.
 
 ### Changed
 
-- **`/docs` sets its own CSP** in the app's mode: the default policy plus the Scalar bundle's
-  origin in `script-src` and `https://fonts.scalar.com` in `font-src`, so the reference keeps
-  rendering once an app enforces. Scalar's calls to `api.scalar.com` stay blocked.
+- **`/docs` extends the app's CSP** through `SecurityOverride`: the Scalar bundle's origin in
+  `script-src` and `https://fonts.scalar.com` in `font-src`, so the reference keeps rendering
+  once an app enforces. Scalar's calls to `api.scalar.com` stay blocked.
 
 ### Upgrade note for apps
 
-The CSP starts in report-only, and the other headers carry the values most apps already set in
-a local `SecurityHeaders`. **One header is enforced from the first deploy and does break apps:**
-`Permissions-Policy` denies the camera and microphone, so **Echo and Prisme** (both on
-livekit-client) must ship `Security: middleware.SecurityConfig{Allow: []string{"camera",
-"microphone"}}` in the same upgrade, or calls lose their media. Field keeps working because its
-own `securityHeaders` runs after the chassis and replaces the header. Then:
+The full CSP starts in report-only. Three things are enforced from the first deploy and break
+apps that are not ready, so ship the fix in the same upgrade:
 
-1. Shrink the local `SecurityHeaders` middleware (Agenda, Courrier, Journal, Nuage, Plume) and
-   Field's `headers.go` to `X-Frame-Options: DENY`, and delete that too once the CSP is
-   enforced: until then `frame-ancestors` only reports, and `X-Frame-Options` is the only
-   framing guard. Agenda's copy believed `X-Forwarded-Proto` from any peer; the chassis does not.
-   Field's also grants media: move it to `Allow: camera, microphone, display-capture,
-   speaker-selection` before deleting the header.
+- **Camera and microphone.** `Permissions-Policy` denies them. **Echo and Prisme** (both on
+  livekit-client) need `Security: middleware.SecurityConfig{Allow: []string{"camera",
+  "microphone"}}`, or calls lose their media. Field sets its own header after the chassis and
+  keeps working.
+- **Framing.** `frame-ancestors 'none'` and `X-Frame-Options: DENY` are enforced. **Echo's
+  `/embed/`** keeps its own CSP but now also gets `X-Frame-Options: DENY`, which blocks the
+  embed: mount `SecurityOverride` with `frame-ancestors` set to the embed origins on `/embed/`,
+  and delete `FrameAncestors`. Any other page another origin frames (check the Plume and
+  Ardoise embeds) needs the same override.
+- **COOP.** `same-origin` cuts `window.opener` to a cross-origin popup. An app whose OAuth or
+  payment popup reports back through `window.opener` needs `same-origin-allow-popups`. None was
+  found; redirect flows are unaffected.
+
+Then:
+
+1. Delete the local `SecurityHeaders` middleware (Agenda, Courrier, Journal, Nuage, Plume),
+   `X-Frame-Options` included: the chassis now sends everything they sent. Agenda's copy
+   believed `X-Forwarded-Proto` from any peer; the chassis does not. Field: move its grants to
+   `Allow: camera, microphone, display-capture, speaker-selection` before deleting `headers.go`.
 2. Pass `spa.InlineScriptHashes(clientDir)` as `CSPSources["script-src"]` in every app that
    serves its SvelteKit client from the binary.
 3. Add what the app loads from elsewhere. Echo and Prisme: the LiveKit origin (`wss://` and
-   `https://`) in `connect-src`; Echo also `SecurityOverride` with `frame-ancestors` on
-   `/embed/` in place of its `FrameAncestors`. Casier (`iconify-icon` from jsDelivr in
-   `app.html`), and the Nuage and Capsule `/docs` client routes (Scalar from jsDelivr):
-   `https://cdn.jsdelivr.net` in `script-src`, or move to tronc's `apiref`. Opus's YouTube
-   embeds: `frame-src`.
-4. Deploy, use every screen, and read the console for `[Report Only]` violations. When a release
-   shows none, set `CSPEnforce: true`.
-
-Echo's `FrameAncestors` and Field's `securityHeaders` send their own enforced
-`Content-Security-Policy: frame-ancestors ...`. In report-only mode it sits beside the chassis
-policy and both apply. Once the app enforces, both write the same header and the app's
-middleware, running later, replaces the chassis policy, so drop it before setting `CSPEnforce`.
+   `https://`) in `connect-src`. Casier (`iconify-icon` from jsDelivr in `app.html`), and the
+   Nuage and Capsule `/docs` client routes (Scalar from jsDelivr): `https://cdn.jsdelivr.net` in
+   `script-src`, or move to tronc's `apiref`. Opus's YouTube embeds: `frame-src`.
+4. Deploy, use every screen, and read the console for `[Report Only]` violations. Without
+   `CSPReportURI` they appear in the console and nowhere else. When a release shows none, set
+   `CSPEnforce: true`.
 
 ## [0.14.1] - 2026-08-22
 

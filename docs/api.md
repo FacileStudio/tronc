@@ -140,7 +140,7 @@ is the same as one never sent.
 
 ```go
 func SecurityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler
-func SecurityOverride(cfg SecurityConfig) func(http.Handler) http.Handler
+func SecurityOverride(cfg SecurityOverrideConfig) func(http.Handler) http.Handler
 func BuildCSP(extra map[string][]string, reportURI string) (string, error)
 func IsHTTPS(request *http.Request, trusted []netip.Prefix) bool
 ```
@@ -150,6 +150,8 @@ func IsHTTPS(request *http.Request, trusted []netip.Prefix) bool
 | Header | Value |
 |---|---|
 | `Content-Security-Policy-Report-Only` | `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'` |
+| `Content-Security-Policy` | `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, enforced while the full policy only reports |
+| `X-Frame-Options` | `DENY`, unless `CSPSources` opens `frame-ancestors` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
@@ -158,16 +160,27 @@ func IsHTTPS(request *http.Request, trusted []netip.Prefix) bool
 
 | `SecurityConfig` field | Type | Default | Notes |
 |---|---|---|---|
-| `CSPEnforce` | `bool` | `false` | `false` sends the policy as `Content-Security-Policy-Report-Only` |
+| `CSPEnforce` | `bool` | `false` | `true` sends the full policy as `Content-Security-Policy`. `false` reports it and enforces only its `frame-ancestors`, `object-src` and `base-uri` |
 | `CSPSources` | `map[string][]string` | — | Extra sources per directive. Extends the default, replaces a `'none'` default, appends a directive the default lacks (`frame-src`, `media-src`, `font-src`, `worker-src`) in name order |
-| `CSPReportURI` | `string` | — | Appends `report-uri` |
+| `CSPReportURI` | `string` | — | Appends `report-uri`. Without it a report-only violation shows in the browser console only |
 | `Allow` | `[]string` | — | Permissions-Policy features granted to `(self)` |
 | `CrossOriginOpenerPolicy` | `string` | `same-origin` | Also `same-origin-allow-popups`, `noopener-allow-popups`, `unsafe-none` |
+| `HSTSExcludeSubdomains` | `bool` | `false` | Drops `includeSubDomains`, for a host whose subdomains are not all on HTTPS |
 | `Trusted` | `[]netip.Prefix` | the router's trusted proxies, filled by `httpx` | Peers whose `X-Forwarded-Proto` is believed; nil trusts none |
 
 `IsHTTPS` is true when the connection is TLS, or when the peer is in `trusted` and the rightmost
 `X-Forwarded-Proto` value, the one the nearest proxy wrote, is `https`. Plain HTTP in local
 development gets no HSTS.
+
+**The framing guard does not wait for the rollout.** A report-only CSP blocks nothing, so the
+chassis also enforces the policy's `frame-ancestors`, `object-src` and `base-uri` in a
+`Content-Security-Policy` of their own, plus `X-Frame-Options: DENY`. Both CSP headers apply;
+the enforced one never gains a directive the report-only one lacks, so it cannot block what is
+still being tuned. Apps can delete their local `X-Frame-Options` middleware.
+
+**COOP and popups.** `same-origin` severs `window.opener` between the app and a cross-origin
+popup. An OAuth or payment popup that reports back through `window.opener` needs
+`same-origin-allow-popups`; a redirect flow needs nothing.
 
 `style-src` carries `'unsafe-inline'` on purpose: Svelte transitions and SvelteKit's markup write
 inline styles, and a style cannot run code. `script-src` does not.
@@ -179,25 +192,29 @@ SSE endpoint on the app's own host needs nothing. A different host (LiveKit) nee
 set it, so `w.Header().Set(...)` in a handler replaces it and `w.Header().Del(...)` removes it.
 Use `Set`, not `Add`: two CSP headers are both enforced, so an added one narrows, never widens.
 
-**Per route**, mount `SecurityOverride` on the route or group. It replaces every header the
-chassis set with the ones its config describes, and drops the CSP header of the other mode:
+**Per route**, mount `SecurityOverride` on the route or group. It **extends** what the chassis
+sent rather than rebuilding it: it reads the outer CSP headers back, adds its sources, and writes
+into the same headers, so the route keeps the app's mode, inline script hashes and `report-uri`.
 
 ```go
-embed := appSecurity
-embed.CSPSources = map[string][]string{
-	"script-src":      hashes,
-	"frame-ancestors": {"https://ardoise.facile.studio"},
-}
-router.With(middleware.SecurityOverride(embed)).Get("/embed/{id}", handler)
+router.With(middleware.SecurityOverride(middleware.SecurityOverrideConfig{
+	CSPSources: map[string][]string{"frame-ancestors": {"https://ardoise.facile.studio"}},
+})).Get("/embed/{id}", handler)
 ```
 
-The override's config is the whole policy for that route, not a delta: repeat every source the
-page still needs, such as the inline script hashes. Build a fresh map rather than writing into
-the app's.
+| `SecurityOverrideConfig` field | Effect |
+|---|---|
+| `CSPSources` | Extends the full policy. Extends the enforced framing policy only in the directives it already has. Opening `frame-ancestors` also drops `X-Frame-Options` |
+| `CSPEnforce *bool` | `true` promotes a report-only route to enforced. `false` on an enforced app is ignored: a route never downgrades |
+| `Allow` | Grants more Permissions-Policy features to `(self)` |
+| `CrossOriginOpenerPolicy` | Replaces the outer value when set |
+
+A route with no CSP from the chassis gets none: there is nothing to extend.
 
 `SecurityHeaders` and `SecurityOverride` **panic at construction**, and `BuildCSP` returns an
 error, on a source containing `;`, `,`, whitespace or a control character, a directive or
-feature name outside `[a-z-]`, or an unknown COOP value. Each of those would inject a directive or split the header.
+feature name outside `[a-z-]`, or an unknown COOP value. Each of those would inject a directive
+or split the header.
 
 **SvelteKit's inline scripts.** adapter-static writes two inline scripts into `index.html`: the
 bootstrap that imports the entry chunks, whose content changes on every build, and anything
@@ -226,12 +243,13 @@ reach those pages: configure `kit.csp` with `mode: 'auto'` there.
 **Staged rollout.** Every app starts in report-only, which is the default:
 
 1. Upgrade. Add `CSPSources` for what the app loads (inline script hashes, LiveKit, an embed
-   parent). Optionally point `CSPReportURI` at a collector.
+   parent). Optionally point `CSPReportURI` at a collector; tronc ships none, because an
+   unauthenticated endpoint that writes logs needs a size cap and a rate limit of its own.
 2. Deploy and use every screen. Read the browser console, or the reports, for `[Report Only]`
    violations. Fix each by adding the source or changing the code.
 3. When a release shows no violation, set `CSPEnforce: true`.
 
-The other headers are enforced from the first deploy.
+The other headers, and the framing policy, are enforced from the first deploy.
 
 ### Request ID
 
@@ -397,7 +415,9 @@ func InlineScriptHashes(dir string) ([]string, error)
 ```
 
 `InlineScriptHashes` walks `dir` for `.html` files and returns a sorted, deduplicated
-`'sha256-...'` source for each inline `<script>` without a `src`, after the CRLF normalisation
+`'sha256-...'` source for each inline `<script>` without a `src`. It reads attributes the way
+the HTML tokenizer does, so a quoted value holding `>` or `src=` cannot end the tag early or pass
+for a `src`. Hashes are taken after the CRLF normalisation
 the browser applies before hashing. Pass it as the `script-src` entry of
 `SecurityConfig.CSPSources`; see [Security headers](#security-headers).
 
@@ -530,10 +550,10 @@ developer-facing page, but it does mean `/docs` renders blank on an air-gapped d
 Set `Config.ScriptURL` to a locally served copy where that matters. Nothing else in tronc
 reaches the network.
 
-The page replaces the chassis CSP with the default policy plus the bundle's origin in
-`script-src` and `ScalarFontOrigin` (`https://fonts.scalar.com`) in `font-src`, in whichever
-mode the app runs, so `/docs` keeps rendering once an app enforces. It adds no CSP when the app
-sent none. Scalar's calls to `api.scalar.com` (its public API registry) stay blocked by
+The page mounts `SecurityOverride` adding the bundle's origin to `script-src` and
+`ScalarFontOrigin` (`https://fonts.scalar.com`) to `font-src`, so `/docs` keeps rendering once
+an app enforces, in the app's mode and with its other sources. It adds no CSP when the app sent
+none. Scalar's calls to `api.scalar.com` (its public API registry) stay blocked by
 `connect-src`; the reference renders without them.
 
 ## `migrate`
