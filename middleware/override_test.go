@@ -106,3 +106,34 @@ func TestSecurityOverrideRefusesBadValues(t *testing.T) {
 		}
 	}
 }
+
+func TestSecurityOverrideKeepsExtraCSPValues(t *testing.T) {
+	extra := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+			w.Header().Add(HeaderCSP, "sandbox allow-scripts")
+			w.Header().Add(HeaderCSPReportOnly, "upgrade-insecure-requests")
+			next.ServeHTTP(w, request)
+		})
+	}
+	for name, override := range map[string]SecurityOverrideConfig{
+		"report-only": {CSPSources: embedding},
+		"promoted":    {CSPSources: embedding, CSPEnforce: &enforce},
+	} {
+		mw := func(next http.Handler) http.Handler {
+			return SecurityHeaders(SecurityConfig{CSPSources: hashes})(extra(SecurityOverride(override)(next)))
+		}
+		header := serveSecure(t, mw, nil, httptest.NewRequest(http.MethodGet, "/", nil))
+
+		enforced, reportOnly := header.Values(HeaderCSP), header.Values(HeaderCSPReportOnly)
+		if len(enforced) != 2 || enforced[1] != "sandbox allow-scripts" || !strings.Contains(enforced[0], "frame-ancestors https://ardoise.example.test") {
+			t.Errorf("%s: enforced values = %q", name, enforced)
+		}
+		wantReport := 2
+		if override.CSPEnforce != nil {
+			wantReport = 1
+		}
+		if len(reportOnly) != wantReport || reportOnly[len(reportOnly)-1] != "upgrade-insecure-requests" {
+			t.Errorf("%s: report-only values = %q", name, reportOnly)
+		}
+	}
+}
