@@ -27,8 +27,14 @@ func TestSecurityHeadersAreOnByDefault(t *testing.T) {
 		handler.ServeHTTP(recorder, request)
 
 		header := recorder.Header()
-		if header.Get(middleware.HeaderCSPReportOnly) == "" || header.Get(middleware.HeaderCSP) != "" {
-			t.Errorf("%s: CSP is not report-only by default: %v", name, header)
+		if header.Get(middleware.HeaderCSPReportOnly) == "" {
+			t.Errorf("%s: the full CSP is not report-only by default: %v", name, header)
+		}
+		if got := header.Get(middleware.HeaderCSP); got != "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" {
+			t.Errorf("%s: enforced framing policy = %q", name, got)
+		}
+		if header.Get(middleware.HeaderFrameOptions) != "DENY" {
+			t.Errorf("%s: X-Frame-Options missing", name)
 		}
 		if header.Get(middleware.HeaderContentTypeOpts) != "nosniff" {
 			t.Errorf("%s: nosniff missing", name)

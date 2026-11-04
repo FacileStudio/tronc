@@ -12,6 +12,8 @@ const defaultPolicy = "default-src 'self'; base-uri 'self'; object-src 'none'; f
 	"form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; " +
 	"style-src 'self' 'unsafe-inline'"
 
+const framingOnly = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+
 func serveSecure(t *testing.T, mw func(http.Handler) http.Handler, handler http.HandlerFunc, request *http.Request) http.Header {
 	t.Helper()
 	if handler == nil {
@@ -27,6 +29,8 @@ func TestSecurityHeadersDefaults(t *testing.T) {
 
 	want := map[string]string{
 		HeaderCSPReportOnly:     defaultPolicy,
+		HeaderCSP:               framingOnly,
+		HeaderFrameOptions:      "DENY",
 		HeaderContentTypeOpts:   "nosniff",
 		HeaderReferrerPolicy:    "strict-origin-when-cross-origin",
 		HeaderPermissionsPolicy: "camera=(), microphone=(), geolocation=()",
@@ -36,9 +40,6 @@ func TestSecurityHeadersDefaults(t *testing.T) {
 		if got := header.Get(key); got != value {
 			t.Errorf("%s = %q, want %q", key, got, value)
 		}
-	}
-	if got := header.Get(HeaderCSP); got != "" {
-		t.Errorf("report-only default also sent an enforced CSP: %q", got)
 	}
 	if got := header.Get(HeaderHSTS); got != "" {
 		t.Errorf("plain HTTP got HSTS: %q", got)
@@ -206,24 +207,25 @@ func TestUpstreamHeadersAreNotOverwritten(t *testing.T) {
 	}
 }
 
-func TestSecurityOverrideReplacesForOneRoute(t *testing.T) {
-	embed := SecurityConfig{
-		CSPEnforce: true,
-		CSPSources: map[string][]string{"frame-ancestors": {"https://ardoise.example.test"}},
-		Allow:      []string{"camera"},
-	}
-	mw := func(next http.Handler) http.Handler {
-		return SecurityHeaders(SecurityConfig{})(SecurityOverride(embed)(next))
-	}
-	header := serveSecure(t, mw, nil, httptest.NewRequest(http.MethodGet, "/embed/1", nil))
+func TestFramingIsEnforcedInReportOnlyAndFollowsTheAppsSources(t *testing.T) {
+	header := serveSecure(t, SecurityHeaders(SecurityConfig{CSPSources: map[string][]string{
+		"frame-ancestors": {"https://ardoise.example.test"},
+		"script-src":      {"'sha256-abc='"},
+	}}), nil, httptest.NewRequest(http.MethodGet, "/", nil))
 
-	if got := header.Get(HeaderCSPReportOnly); got != "" {
-		t.Errorf("the outer report-only policy survived the override: %q", got)
+	if got := header.Get(HeaderCSP); got != "frame-ancestors https://ardoise.example.test; object-src 'none'; base-uri 'self'" {
+		t.Errorf("enforced framing policy = %q", got)
 	}
-	if got := header.Values(HeaderCSP); len(got) != 1 || !strings.Contains(got[0], "frame-ancestors https://ardoise.example.test;") {
-		t.Errorf("override CSP = %q", got)
+	if got := header.Get(HeaderFrameOptions); got != "" {
+		t.Errorf("X-Frame-Options sent although frame-ancestors is open: %q", got)
 	}
-	if got := header.Get(HeaderPermissionsPolicy); !strings.HasPrefix(got, "camera=(self)") {
-		t.Errorf("override Permissions-Policy = %q", got)
+}
+
+func TestHSTSCanExcludeSubdomains(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.TLS = &tls.ConnectionState{}
+	header := serveSecure(t, SecurityHeaders(SecurityConfig{HSTSExcludeSubdomains: true}), nil, request)
+	if got := header.Get(HeaderHSTS); got != "max-age=31536000" {
+		t.Errorf("HSTS = %q", got)
 	}
 }

@@ -25,23 +25,25 @@ func docsHeader(t *testing.T, security func(http.Handler) http.Handler) http.Hea
 }
 
 func TestDocsPageAllowsScalarInTheAppsCSPMode(t *testing.T) {
+	scalar := []string{"script-src 'self' https://cdn.jsdelivr.net;", "font-src 'self' " + apiref.ScalarFontOrigin, "frame-ancestors 'none'", "report-uri /csp"}
 	for name, cfg := range map[string]middleware.SecurityConfig{
-		middleware.HeaderCSP:           {CSPEnforce: true},
-		middleware.HeaderCSPReportOnly: {},
+		"enforced":    {CSPEnforce: true, CSPReportURI: "/csp"},
+		"report-only": {CSPReportURI: "/csp"},
 	} {
 		header := docsHeader(t, middleware.SecurityHeaders(cfg))
-		policy := header.Get(name)
-		for _, want := range []string{"script-src 'self' https://cdn.jsdelivr.net;", "font-src 'self' " + apiref.ScalarFontOrigin, "frame-ancestors 'none'"} {
-			if !strings.Contains(policy, want) {
-				t.Errorf("%s = %q, lacks %q", name, policy, want)
+		full := header.Get(middleware.HeaderCSP)
+		if !cfg.CSPEnforce {
+			full = header.Get(middleware.HeaderCSPReportOnly)
+			if got := header.Get(middleware.HeaderCSP); got != "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" {
+				t.Errorf("%s: the enforced framing policy changed: %q", name, got)
 			}
+		} else if got := header.Get(middleware.HeaderCSPReportOnly); got != "" {
+			t.Errorf("%s: the docs page downgraded to report-only: %q", name, got)
 		}
-		other := middleware.HeaderCSPReportOnly
-		if name == other {
-			other = middleware.HeaderCSP
-		}
-		if got := header.Get(other); got != "" {
-			t.Errorf("the docs page switched the CSP mode: %s = %q", other, got)
+		for _, want := range scalar {
+			if !strings.Contains(full, want) {
+				t.Errorf("%s: policy %q lacks %q", name, full, want)
+			}
 		}
 	}
 }

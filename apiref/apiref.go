@@ -82,16 +82,11 @@ func (c Config) withDefaults() Config {
 func Mount(router chi.Router, cfg Config) {
 	cfg = cfg.withDefaults()
 	document := OpenAPI(cfg)
-	policy := pagePolicy(cfg.ScriptURL)
 
-	router.Get(BasePath, func(w http.ResponseWriter, request *http.Request) {
-		header := w.Header()
-		for _, key := range []string{middleware.HeaderCSP, middleware.HeaderCSPReportOnly} {
-			if header.Get(key) != "" {
-				header.Set(key, policy)
-			}
-		}
-		header.Set("Content-Type", "text/html; charset=utf-8")
+	router.With(middleware.SecurityOverride(middleware.SecurityOverrideConfig{
+		CSPSources: pageSources(cfg.ScriptURL),
+	})).Get(BasePath, func(w http.ResponseWriter, request *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(page(cfg, request.URL.Path+"/openapi.json")))
 	})
 
@@ -101,21 +96,20 @@ func Mount(router chi.Router, cfg Config) {
 	})
 }
 
-// pagePolicy is the default CSP widened to the Scalar bundle and its fonts. A
-// ScriptURL whose host would corrupt the policy is left out, not injected. The
-// page keeps the app's CSP mode: it replaces whichever CSP header the chassis
-// set, and sets none when the chassis set none.
-func pagePolicy(scriptURL string) string {
+// pageSources widens the app's CSP to the Scalar bundle and its fonts, in
+// whatever mode the app runs. A ScriptURL whose host would corrupt the
+// policy is left out, not injected.
+func pageSources(scriptURL string) map[string][]string {
 	sources := map[string][]string{"font-src": {"'self'", ScalarFontOrigin}}
-	if parsed, err := url.Parse(scriptURL); err == nil && parsed.Scheme == "https" && parsed.Host != "" {
-		sources["script-src"] = []string{"https://" + parsed.Host}
+	parsed, err := url.Parse(scriptURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return sources
 	}
-	if policy, err := middleware.BuildCSP(sources, ""); err == nil {
-		return policy
+	withScript := map[string][]string{"font-src": sources["font-src"], "script-src": {"https://" + parsed.Host}}
+	if _, err := middleware.BuildCSP(withScript, ""); err != nil {
+		return sources
 	}
-	delete(sources, "script-src")
-	policy, _ := middleware.BuildCSP(sources, "")
-	return policy
+	return withScript
 }
 
 var pageTemplate = template.Must(template.New("apiref").Parse(`<!doctype html>

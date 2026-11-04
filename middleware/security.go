@@ -12,6 +12,7 @@ const (
 	HeaderCSP               = "Content-Security-Policy"
 	HeaderCSPReportOnly     = "Content-Security-Policy-Report-Only"
 	HeaderContentTypeOpts   = "X-Content-Type-Options"
+	HeaderFrameOptions      = "X-Frame-Options"
 	HeaderReferrerPolicy    = "Referrer-Policy"
 	HeaderPermissionsPolicy = "Permissions-Policy"
 	HeaderCOOP              = "Cross-Origin-Opener-Policy"
@@ -21,23 +22,30 @@ const (
 const HSTSValue = "max-age=31536000; includeSubDomains"
 
 // SecurityConfig shapes the security headers. The zero value is the suite
-// default, with the CSP in report-only mode.
+// default, with the full CSP in report-only mode.
 type SecurityConfig struct {
-	// CSPEnforce sends Content-Security-Policy. False sends the same policy
-	// as Content-Security-Policy-Report-Only, which is where every app
-	// starts: the browser reports what it would block and blocks nothing.
+	// CSPEnforce sends the full policy as Content-Security-Policy. False,
+	// where every app starts, sends it as Content-Security-Policy-Report-Only
+	// and enforces only its frame-ancestors, object-src and base-uri, in a
+	// Content-Security-Policy of their own.
 	CSPEnforce bool
 	// CSPSources adds sources to a directive, keyed by directive name. See
 	// BuildCSP for how they combine with the default policy.
 	CSPSources map[string][]string
-	// CSPReportURI, when set, appends a report-uri directive.
+	// CSPReportURI, when set, appends a report-uri directive. Without it, a
+	// report-only violation shows in the browser console and nowhere else.
 	CSPReportURI string
 	// Allow grants each listed Permissions-Policy feature to the page's own
 	// origin, e.g. "camera" and "microphone" for a video app. camera,
 	// microphone and geolocation are denied unless listed.
 	Allow []string
-	// CrossOriginOpenerPolicy defaults to same-origin.
+	// CrossOriginOpenerPolicy defaults to same-origin, which cuts the link
+	// to a cross-origin popup: an OAuth or payment popup that reports back
+	// through window.opener needs same-origin-allow-popups.
 	CrossOriginOpenerPolicy string
+	// HSTSExcludeSubdomains drops includeSubDomains from HSTS, for an app on
+	// a host whose subdomains are not all served over HTTPS.
+	HSTSExcludeSubdomains bool
 	// Trusted are the peers whose X-Forwarded-Proto is believed for the
 	// HSTS decision. nil trusts none; httpx fills it with the router's
 	// trusted proxies.
@@ -46,7 +54,7 @@ type SecurityConfig struct {
 
 type securityHeaders struct {
 	static  [][2]string
-	cspDrop string
+	hsts    string
 	trusted []netip.Prefix
 }
 
@@ -56,25 +64,22 @@ type securityHeaders struct {
 // set it, so a handler that calls Header().Set on one of them wins. Use Set,
 // not Add: an added second CSP is enforced alongside the first, not instead.
 //
+// X-Frame-Options: DENY is sent unless CSPSources opens frame-ancestors, so
+// browsers that ignore frame-ancestors are covered too.
+//
 // It panics at construction on a source, directive or feature that would
 // corrupt the header, the same stance CORS takes on a credential leak.
 func SecurityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
-	return mustSecurityHeaders(cfg).middleware(false)
+	return must(newSecurityHeaders(cfg)).middleware
 }
 
-// SecurityOverride replaces the headers set further out with the ones cfg
-// describes, for one route or group: a public embed that must be framed,
-// a page that needs the camera. Mount it on that route only.
-func SecurityOverride(cfg SecurityConfig) func(http.Handler) http.Handler {
-	return mustSecurityHeaders(cfg).middleware(true)
-}
-
-func mustSecurityHeaders(cfg SecurityConfig) *securityHeaders {
-	headers, err := newSecurityHeaders(cfg)
+// must turns a construction error into the startup panic both middlewares
+// promise, so a malformed policy never reaches a response.
+func must[T any](value T, err error) T {
 	if err != nil {
 		panic(err.Error())
 	}
-	return headers
+	return value
 }
 
 func newSecurityHeaders(cfg SecurityConfig) (*securityHeaders, error) {
@@ -82,7 +87,7 @@ func newSecurityHeaders(cfg SecurityConfig) (*securityHeaders, error) {
 	if err != nil {
 		return nil, err
 	}
-	policy, err := BuildCSP(cfg.CSPSources, cfg.CSPReportURI)
+	directives, err := buildDirectives(cfg.CSPSources, cfg.CSPReportURI)
 	if err != nil {
 		return nil, err
 	}
@@ -91,46 +96,52 @@ func newSecurityHeaders(cfg SecurityConfig) (*securityHeaders, error) {
 		return nil, err
 	}
 
-	cspKey, cspDrop := HeaderCSPReportOnly, HeaderCSP
-	if cfg.CSPEnforce {
-		cspKey, cspDrop = HeaderCSP, HeaderCSPReportOnly
+	static := append(cspHeaders(directives, cfg),
+		[2]string{HeaderContentTypeOpts, "nosniff"},
+		[2]string{HeaderReferrerPolicy, "strict-origin-when-cross-origin"},
+		[2]string{HeaderPermissionsPolicy, permissions},
+		[2]string{HeaderCOOP, coop},
+	)
+	hsts := HSTSValue
+	if cfg.HSTSExcludeSubdomains {
+		hsts = "max-age=31536000"
 	}
-	return &securityHeaders{
-		static: [][2]string{
-			{cspKey, policy},
-			{HeaderContentTypeOpts, "nosniff"},
-			{HeaderReferrerPolicy, "strict-origin-when-cross-origin"},
-			{HeaderPermissionsPolicy, permissions},
-			{HeaderCOOP, coop},
-		},
-		cspDrop: cspDrop,
-		trusted: cfg.Trusted,
-	}, nil
+	return &securityHeaders{static: static, hsts: hsts, trusted: cfg.Trusted}, nil
 }
 
-func (s *securityHeaders) middleware(replace bool) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-			header := w.Header()
-			if replace {
-				header.Del(s.cspDrop)
-			}
-			for _, pair := range s.static {
-				setHeader(header, pair[0], pair[1], replace)
-			}
-			if IsHTTPS(request, s.trusted) {
-				setHeader(header, HeaderHSTS, HSTSValue, replace)
-			}
-			next.ServeHTTP(w, request)
-		})
+// cspHeaders are the full policy, enforced or reported, the framing policy
+// enforced beside a reported one, and X-Frame-Options while framing is shut.
+func cspHeaders(directives []cspDirective, cfg SecurityConfig) [][2]string {
+	headers := [][2]string{{HeaderCSP, renderPolicy(directives)}}
+	if !cfg.CSPEnforce {
+		headers = [][2]string{
+			{HeaderCSPReportOnly, renderPolicy(directives)},
+			{HeaderCSP, renderPolicy(framingPolicy(directives))},
+		}
 	}
+	if len(cfg.CSPSources["frame-ancestors"]) == 0 {
+		headers = append(headers, [2]string{HeaderFrameOptions, "DENY"})
+	}
+	return headers
 }
 
-func setHeader(header http.Header, key, value string, replace bool) {
-	if _, present := header[key]; present && !replace {
-		return
+func (s *securityHeaders) middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		header := w.Header()
+		for _, pair := range s.static {
+			setIfAbsent(header, pair[0], pair[1])
+		}
+		if IsHTTPS(request, s.trusted) {
+			setIfAbsent(header, HeaderHSTS, s.hsts)
+		}
+		next.ServeHTTP(w, request)
+	})
+}
+
+func setIfAbsent(header http.Header, key, value string) {
+	if _, present := header[key]; !present {
+		header.Set(key, value)
 	}
-	header.Set(key, value)
 }
 
 // IsHTTPS reports whether the visitor reached this server over HTTPS: the
