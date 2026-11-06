@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-06
+
 ### Changed
 
 - **`/docs` allows the Scalar bundle's exact URL, not all of jsDelivr.** `script-src` now names
@@ -516,7 +518,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/FacileStudio/tronc/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/FacileStudio/tronc/compare/v0.16.0...v0.17.0
 [0.14.1]: https://github.com/FacileStudio/tronc/releases/tag/v0.14.1
 [0.14.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.14.0
