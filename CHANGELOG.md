@@ -6,6 +6,33 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Changed
+
+- **`/docs` allows the Scalar bundle's exact URL, not all of jsDelivr.** `script-src` now names
+  `https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.64.0` (or the scheme, host and path of
+  `Config.ScriptURL`). Allowing the host allowed every package anyone publishes there. Checked
+  in headless Chromium under an enforced CSP: the reference renders, and only Scalar's
+  `api.scalar.com` registry calls stay blocked. No worker or proxy source is needed; see
+  `docs/api.md`.
+- **An explicit `frame-ancestors 'none'` keeps `X-Frame-Options: DENY`.** Both `SecurityConfig`
+  and `SecurityOverride` dropped it for any `frame-ancestors` source, including `'none'`. It is
+  now dropped only when an origin is allowed to frame the page.
+
+### Added
+
+- **`middleware.MaxCSPHeaderBytes` (4096), and a startup warning past it.** `SecurityHeaders`
+  logs through `slog.Default` when a CSP header outgrows what proxies reliably pass; nginx
+  answers 502 when the headers overflow `proxy_buffer_size`. Each inline script hash costs 54
+  bytes, so the default policy has room for about 70.
+
+### Upgrade note for apps
+
+- **tronc requires Go 1.26 since 0.17.0**, and 0.17.0's changelog did not say so. `go.mod` in
+  the root, `migrate` and `testdb` moved to `go 1.26` (from `1.24.0`, `1.25.7` and `1.24.0` in
+  0.16.0). An app still building on a `golang:1.25` image fails with `go.mod requires go >= 1.26`
+  (or downloads a toolchain, where `GOTOOLCHAIN` allows it). Move the Dockerfile `FROM` and the
+  CI `go-version` to 1.26 in the same change as the bump.
+
 ## [0.17.0] - 2026-11-04
 
 ### Added
@@ -489,7 +516,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/FacileStudio/tronc/compare/v0.16.0...v0.17.0
 [0.14.1]: https://github.com/FacileStudio/tronc/releases/tag/v0.14.1
 [0.14.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.14.0
 [0.13.0]: https://github.com/FacileStudio/tronc/releases/tag/v0.13.0

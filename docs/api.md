@@ -151,7 +151,7 @@ func IsHTTPS(request *http.Request, trusted []netip.Prefix) bool
 |---|---|
 | `Content-Security-Policy-Report-Only` | `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'` |
 | `Content-Security-Policy` | `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, enforced while the full policy only reports |
-| `X-Frame-Options` | `DENY`, unless `CSPSources` opens `frame-ancestors` |
+| `X-Frame-Options` | `DENY`, unless `CSPSources` opens `frame-ancestors` to an origin. An explicit `'none'` keeps it |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
@@ -204,7 +204,7 @@ router.With(middleware.SecurityOverride(middleware.SecurityOverrideConfig{
 
 | `SecurityOverrideConfig` field | Effect |
 |---|---|
-| `CSPSources` | Extends the full policy. Extends the enforced framing policy only in the directives it already has. Opening `frame-ancestors` also drops `X-Frame-Options` |
+| `CSPSources` | Extends the full policy. Extends the enforced framing policy only in the directives it already has. Opening `frame-ancestors` to an origin also drops `X-Frame-Options`; an explicit `'none'` keeps it |
 | `CSPEnforce *bool` | `true` promotes a report-only route to enforced. `false` on an enforced app is ignored: a route never downgrades |
 | `Allow` | Grants more Permissions-Policy features to `(self)` |
 | `CrossOriginOpenerPolicy` | Replaces the outer value when set |
@@ -417,8 +417,14 @@ func InlineScriptHashes(dir string) ([]string, error)
 `InlineScriptHashes` walks `dir` for `.html` files and returns a sorted, deduplicated
 `'sha256-...'` source for each inline `<script>` without a `src`. It reads attributes the way
 the HTML tokenizer does, so a quoted value holding `>` or `src=` cannot end the tag early or pass
-for a `src`. Hashes are taken after the CRLF normalisation
-the browser applies before hashing. Pass it as the `script-src` entry of
+for a `src`. Hashes are taken after the CRLF normalisation the browser applies before hashing.
+
+The hashes all land in one header, and proxies cap response headers (nginx holds all of them in
+a 4 KB or 8 KB `proxy_buffer_size` by default, and answers 502 past it). Each hash costs 54
+bytes, so the default policy has room for about 70 before `SecurityHeaders` warns at startup
+that the CSP exceeds `MaxCSPHeaderBytes` (4096). An SPA build has two; a prerendered site with
+one distinct inline script per page is the case that grows. Past the limit, move inline code
+into files under `script-src 'self'` rather than raising the proxy buffer. Pass it as the `script-src` entry of
 `SecurityConfig.CSPSources`; see [Security headers](#security-headers).
 
 `Handler` serves static files from `cfg.Dir` and falls back to the index document for anything
@@ -550,11 +556,20 @@ developer-facing page, but it does mean `/docs` renders blank on an air-gapped d
 Set `Config.ScriptURL` to a locally served copy where that matters. Nothing else in tronc
 reaches the network.
 
-The page mounts `SecurityOverride` adding the bundle's origin to `script-src` and
-`ScalarFontOrigin` (`https://fonts.scalar.com`) to `font-src`, so `/docs` keeps rendering once
-an app enforces, in the app's mode and with its other sources. It adds no CSP when the app sent
-none. Scalar's calls to `api.scalar.com` (its public API registry) stay blocked by
-`connect-src`; the reference renders without them.
+The page mounts `SecurityOverride` adding the bundle's **exact URL** to `script-src` (scheme,
+host and path; query and fragment dropped) and `ScalarFontOrigin` (`https://fonts.scalar.com`)
+to `font-src`, so `/docs` keeps rendering once an app enforces, in the app's mode and with its
+other sources. It names the file, not `https://cdn.jsdelivr.net`: a CDN serves anyone's
+packages, so allowing the host would allow every script published there. A relative
+`ScriptURL` needs nothing beyond `'self'`. It adds no CSP when the app sent none.
+
+Checked in headless Chromium under an enforced CSP: the reference renders, and the only
+violations are Scalar's calls to `api.scalar.com/vector/registry` (its public API registry),
+which stay blocked and cost nothing. No `worker-src` is needed: the bundle starts no worker.
+"Test request" sends the call straight to the documented server, so a same-origin API is
+covered by `connect-src 'self'`; an API on another origin needs that origin in `connect-src`.
+The bundle only defaults to `https://proxy.scalar.com` in Scalar's own web client layout, not
+in the reference, so requests and their credentials do not pass through Scalar.
 
 ## `migrate`
 

@@ -34,7 +34,7 @@ today.
 
 | Layer | Tech |
 |---|---|
-| Runtime | Go 1.24, `github.com/go-chi/chi/v5` v5.2.3, and nothing else — deliberately |
+| Runtime | Go 1.26, `github.com/go-chi/chi/v5` v5.2.3, and nothing else — deliberately |
 
 ## Install
 
