@@ -97,15 +97,18 @@ func Mount(router chi.Router, cfg Config) {
 }
 
 // pageSources widens the app's CSP to the Scalar bundle and its fonts, in
-// whatever mode the app runs. A ScriptURL whose host would corrupt the
+// whatever mode the app runs. script-src names the bundle's exact URL, not
+// its whole host: a CDN serves anyone's packages, so allowing the host would
+// allow every script published there. A ScriptURL that would corrupt the
 // policy is left out, not injected.
 func pageSources(scriptURL string) map[string][]string {
 	sources := map[string][]string{"font-src": {"'self'", ScalarFontOrigin}}
 	parsed, err := url.Parse(scriptURL)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
 		return sources
 	}
-	withScript := map[string][]string{"font-src": sources["font-src"], "script-src": {"https://" + parsed.Host}}
+	pinned := "https://" + parsed.Host + parsed.EscapedPath()
+	withScript := map[string][]string{"font-src": sources["font-src"], "script-src": {pinned}}
 	if _, err := middleware.BuildCSP(withScript, ""); err != nil {
 		return sources
 	}

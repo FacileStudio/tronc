@@ -25,7 +25,7 @@ func docsHeader(t *testing.T, security func(http.Handler) http.Handler) http.Hea
 }
 
 func TestDocsPageAllowsScalarInTheAppsCSPMode(t *testing.T) {
-	scalar := []string{"script-src 'self' https://cdn.jsdelivr.net;", "font-src 'self' " + apiref.ScalarFontOrigin, "frame-ancestors 'none'", "report-uri /csp"}
+	scalar := []string{"script-src 'self' " + apiref.ScalarScriptURL + ";", "font-src 'self' " + apiref.ScalarFontOrigin, "frame-ancestors 'none'", "report-uri /csp"}
 	for name, cfg := range map[string]middleware.SecurityConfig{
 		"enforced":    {CSPEnforce: true, CSPReportURI: "/csp"},
 		"report-only": {CSPReportURI: "/csp"},
@@ -52,5 +52,24 @@ func TestDocsPageAddsNoCSPWhenTheAppSentNone(t *testing.T) {
 	header := docsHeader(t, nil)
 	if header.Get(middleware.HeaderCSP) != "" || header.Get(middleware.HeaderCSPReportOnly) != "" {
 		t.Errorf("the docs page invented a CSP: %v", header)
+	}
+}
+
+func TestDocsPagePinsTheBundleNotTheHost(t *testing.T) {
+	cases := map[string]string{
+		"https://cdn.example.test/scalar@2.0.0/standalone.js?v=1#x": "script-src 'self' https://cdn.example.test/scalar@2.0.0/standalone.js;",
+		"/static/scalar.js":                         "script-src 'self';",
+		"http://cdn.example.test/scalar.js":         "script-src 'self';",
+		"https://cdn.example.test/a,b;script-src *": "script-src 'self';",
+	}
+	for scriptURL, want := range cases {
+		router := chi.NewRouter()
+		router.Use(middleware.SecurityHeaders(middleware.SecurityConfig{CSPEnforce: true}))
+		apiref.Mount(router, apiref.Config{Title: "Test API", ScriptURL: scriptURL})
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, apiref.BasePath, nil))
+		if got := recorder.Header().Get(middleware.HeaderCSP); !strings.Contains(got, want) {
+			t.Errorf("ScriptURL %q: CSP = %q, want %q", scriptURL, got, want)
+		}
 	}
 }
