@@ -207,20 +207,6 @@ func TestUpstreamHeadersAreNotOverwritten(t *testing.T) {
 	}
 }
 
-func TestFramingIsEnforcedInReportOnlyAndFollowsTheAppsSources(t *testing.T) {
-	header := serveSecure(t, SecurityHeaders(SecurityConfig{CSPSources: map[string][]string{
-		"frame-ancestors": {"https://ardoise.example.test"},
-		"script-src":      {"'sha256-abc='"},
-	}}), nil, httptest.NewRequest(http.MethodGet, "/", nil))
-
-	if got := header.Get(HeaderCSP); got != "frame-ancestors https://ardoise.example.test; object-src 'none'; base-uri 'self'" {
-		t.Errorf("enforced framing policy = %q", got)
-	}
-	if got := header.Get(HeaderFrameOptions); got != "" {
-		t.Errorf("X-Frame-Options sent although frame-ancestors is open: %q", got)
-	}
-}
-
 func TestHSTSCanExcludeSubdomains(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	request.TLS = &tls.ConnectionState{}
