@@ -4,9 +4,9 @@ Local setup, the quality gate, CI, and how versions are cut and consumed.
 
 ## Prerequisites
 
-- **Go 1.24.** `go.mod` declares `go 1.24.0` and `mise.toml` pins the toolchain to `1.24`.
-  Consumers run newer — Mycelium is on 1.26.1, Plume and Casier on 1.25.0 — but 1.24.0 is the
-  floor across the suite and the version CI builds with.
+- **Go 1.26.** `go.mod` in the root, `migrate` and `testdb` declares `go 1.26`, and `mise.toml`
+  pins the toolchain to `1.26`. That is the floor for every consumer since 0.17.0: an app on a
+  `golang:1.25` image cannot build against it.
 - **mise**, for the task runner. Optional; every task is a one-line shell command you can run
   directly.
 - **golangci-lint v2**, optional locally. CI pins `v2.12.2`. The local gate skips the lint pass

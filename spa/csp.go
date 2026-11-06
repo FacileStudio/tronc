@@ -20,7 +20,9 @@ import (
 // the files the binary is about to serve covers both, needs no SvelteKit
 // configuration, and keeps the page cacheable, which a per-request nonce
 // would not. Call it once at startup and pass the result as the script-src
-// entry of SecurityConfig.CSPSources.
+// entry of SecurityConfig.CSPSources. Every hash lands in one header, so a
+// build with more than about 70 distinct inline scripts outgrows what proxies
+// pass; middleware.SecurityHeaders warns past middleware.MaxCSPHeaderBytes.
 func InlineScriptHashes(dir string) ([]string, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
