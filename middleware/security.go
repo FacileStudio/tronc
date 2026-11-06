@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 )
 
@@ -17,6 +19,13 @@ const (
 	HeaderPermissionsPolicy = "Permissions-Policy"
 	HeaderCOOP              = "Cross-Origin-Opener-Policy"
 )
+
+// MaxCSPHeaderBytes is the CSP length past which SecurityHeaders warns at
+// startup. Proxies cap response headers: nginx's default proxy_buffer_size
+// holds all of them in 4 KB or 8 KB, and an over-long header there fails the
+// request with a 502 rather than dropping the policy. Each inline script hash
+// costs 54 bytes with its separator, so the default policy has room for about 70.
+const MaxCSPHeaderBytes = 4096
 
 // HSTSValue is the Strict-Transport-Security value sent on HTTPS requests.
 const HSTSValue = "max-age=31536000; includeSubDomains"
@@ -64,13 +73,21 @@ type securityHeaders struct {
 // set it, so a handler that calls Header().Set on one of them wins. Use Set,
 // not Add: an added second CSP is enforced alongside the first, not instead.
 //
-// X-Frame-Options: DENY is sent unless CSPSources opens frame-ancestors, so
-// browsers that ignore frame-ancestors are covered too.
+// X-Frame-Options: DENY is sent unless CSPSources opens frame-ancestors to an
+// origin, so browsers that ignore frame-ancestors are covered too.
 //
 // It panics at construction on a source, directive or feature that would
-// corrupt the header, the same stance CORS takes on a credential leak.
+// corrupt the header, the same stance CORS takes on a credential leak, and
+// warns through slog.Default when a CSP header exceeds MaxCSPHeaderBytes.
 func SecurityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
-	return must(newSecurityHeaders(cfg)).middleware
+	headers := must(newSecurityHeaders(cfg))
+	for _, pair := range headers.static {
+		if (pair[0] == HeaderCSP || pair[0] == HeaderCSPReportOnly) && len(pair[1]) > MaxCSPHeaderBytes {
+			slog.Warn("tronc/middleware: CSP header exceeds the size proxies reliably pass",
+				slog.String("header", pair[0]), slog.Int("bytes", len(pair[1])), slog.Int("limit", MaxCSPHeaderBytes))
+		}
+	}
+	return headers.middleware
 }
 
 // must turns a construction error into the startup panic both middlewares
@@ -119,10 +136,16 @@ func cspHeaders(directives []cspDirective, cfg SecurityConfig) [][2]string {
 			{HeaderCSP, renderPolicy(framingPolicy(directives))},
 		}
 	}
-	if len(cfg.CSPSources["frame-ancestors"]) == 0 {
+	if !framingOpened(cfg.CSPSources["frame-ancestors"]) {
 		headers = append(headers, [2]string{HeaderFrameOptions, "DENY"})
 	}
 	return headers
+}
+
+// framingOpened reports whether frame-ancestors sources let any origin frame
+// the page. An explicit 'none' keeps it shut, and X-Frame-Options with it.
+func framingOpened(sources []string) bool {
+	return slices.ContainsFunc(sources, func(source string) bool { return source != "'none'" })
 }
 
 func (s *securityHeaders) middleware(next http.Handler) http.Handler {

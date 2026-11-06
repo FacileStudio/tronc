@@ -14,7 +14,8 @@ type SecurityOverrideConfig struct {
 	// route whose outer policy is enforced is ignored.
 	CSPEnforce *bool
 	// CSPSources extend the outer policy's directives, as in BuildCSP.
-	// Opening frame-ancestors also drops X-Frame-Options.
+	// Opening frame-ancestors to an origin also drops X-Frame-Options; an
+	// explicit 'none' keeps it.
 	CSPSources map[string][]string
 	// Allow grants these Permissions-Policy features to (self) on top of
 	// what the outer policy grants.
@@ -74,7 +75,7 @@ func newSecurityOverride(cfg SecurityOverrideConfig) (*securityOverride, error) 
 
 func (o *securityOverride) apply(header http.Header) {
 	o.applyCSP(header)
-	if len(o.sources["frame-ancestors"]) > 0 {
+	if framingOpened(o.sources["frame-ancestors"]) {
 		header.Del(HeaderFrameOptions)
 	}
 	if len(o.allow) > 0 {
