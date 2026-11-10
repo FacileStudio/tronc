@@ -328,6 +328,30 @@ whoever wrote it.
 A nil or empty `trusted` ignores the header entirely. `httpx.Config.TrustedProxies` is where
 apps set this; see [configuration.md](configuration.md).
 
+### Rate limiting
+
+```go
+type RatelimitConfig struct {
+	Limit      float64                                  // tokens per second; <= 0 means DefaultRatelimitLimit (10)
+	Burst      int                                      // bucket size; <= 0 means Limit rounded up
+	KeyFunc    func(*http.Request) string               // nil means the host of RemoteAddr
+	StatusCode int                                      // 0 means 429; ignored when OnRefuse is set
+	MaxKeys    int                                      // 0 keeps every key; > 0 forgets the idlest keys first
+	OnRefuse   func(http.ResponseWriter, *http.Request) // nil writes RateLimitExceededBody as text/plain
+}
+
+func Ratelimit(cfg RatelimitConfig) func(http.Handler) http.Handler
+func NewLimiter(cfg RatelimitConfig) *Limiter               // reads Limit, Burst, MaxKeys
+func (l *Limiter) Allow(key string) bool
+func (l *Limiter) AllowAt(key string, now time.Time) (bool, time.Duration)
+func RemoteAddrKey64(request *http.Request) string          // IPv4 address, or IPv6 /64
+```
+
+A token bucket per key, refilled continuously, with no goroutine. A refusal always carries
+`Retry-After` in whole seconds. `Limiter` is the same bucket without HTTP, for limits applied
+inside a handler or outside any request. Not in `httpx.NewRouter`'s chain: mount it on the
+routes that need it. Per-app replacement configs are in [ratelimit.md](ratelimit.md).
+
 ### Recovery
 
 ```go

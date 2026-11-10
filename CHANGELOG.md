@@ -6,6 +6,27 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **`middleware.Limiter`, the rate limit bucket without HTTP.** `NewLimiter(RatelimitConfig)`
+  builds the same token bucket `Ratelimit` uses. `Allow(key)` spends a token now; `AllowAt(key,
+  now)` takes the clock and also returns the wait a refusal would send as `Retry-After`. It is
+  for limits that run inside a handler or outside any request, such as Mycelium's login and
+  Bulle's per-guest message budget.
+- **`RatelimitConfig.MaxKeys`** bounds the keys a limiter remembers. Past the bound, the keys
+  idle longest are forgotten first. Zero keeps every key, as before.
+- **`RatelimitConfig.OnRefuse`** writes the refusal, for apps whose clients parse the JSON error
+  envelope on 429. `Retry-After` is already set when it runs. Nil keeps the plain-text body and
+  `StatusCode`.
+- **`middleware.RemoteAddrKey64`**, a `KeyFunc` that buckets IPv6 callers by their /64, as
+  httprate's `KeyByIP` did for Journal and Nuage.
+- `docs/ratelimit.md`: what replaces each of the nine limiters written in the apps, and which
+  stay app-side.
+
+The zero value of every new field keeps the existing middleware's decisions, `Retry-After`
+values, headers and body unchanged. `TestLimiterMatchesTheOriginalBucketDecisionForDecision`
+replays 20 000 requests against a copy of the previous bucket to prove it.
+
 ## [0.20.0] - 2026-11-10
 
 ### Added
