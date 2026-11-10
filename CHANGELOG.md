@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-10
+
 ### Added
 
 - **Read-only MCP servers.** `mcp.Options.Scopes` may set `Read` alone when every tool is
