@@ -1,0 +1,386 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "spa",
+  "cases": [
+    {
+      "name": "root_serves_index",
+      "input": {
+        "method": "GET",
+        "path": "/",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "index.html",
+        "headers": {
+          "Cache-Control": "no-cache",
+          "Content-Type": "text/html; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "history_fallback",
+      "input": {
+        "method": "GET",
+        "path": "/sheets/42/edit",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "index.html",
+        "headers": {
+          "Cache-Control": "no-cache",
+          "Content-Type": "text/html; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "history_fallback_head",
+      "input": {
+        "method": "HEAD",
+        "path": "/sheets/42",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "headers": {
+          "Cache-Control": "no-cache",
+          "Content-Type": "text/html; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "directory_falls_back",
+      "input": {
+        "method": "GET",
+        "path": "/docs",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "index.html",
+        "headers": {
+          "Cache-Control": "no-cache",
+          "Content-Type": "text/html; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "real_file",
+      "input": {
+        "method": "GET",
+        "path": "/app.css",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "app.css",
+        "headers": {
+          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Content-Type": "text/css; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "immutable_asset",
+      "input": {
+        "method": "GET",
+        "path": "/_app/immutable/entry/start.a1.js",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "_app/immutable/entry/start.a1.js",
+        "headers": {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": "text/javascript; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "immutable_assets_prefix",
+      "input": {
+        "method": "GET",
+        "path": "/assets/logo.b2.svg",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "assets/logo.b2.svg",
+        "headers": {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": "image/svg+xml"
+        }
+      }
+    },
+    {
+      "name": "nested_real_file",
+      "input": {
+        "method": "GET",
+        "path": "/docs/guide.json",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "docs/guide.json",
+        "headers": {
+          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "missing_asset_with_extension",
+      "input": {
+        "method": "GET",
+        "path": "/_app/immutable/entry/gone.js",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 404,
+        "body": "404 page not found\n",
+        "headers": {
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "missing_file_with_extension",
+      "input": {
+        "method": "GET",
+        "path": "/robots.txt",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 404,
+        "body": "404 page not found\n",
+        "headers": {
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "dotfile_hidden",
+      "input": {
+        "method": "GET",
+        "path": "/.env",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 404,
+        "body": "404 page not found\n",
+        "headers": {
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "index_redirects_to_directory",
+      "input": {
+        "method": "GET",
+        "path": "/index.html",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 301,
+        "headers": {
+          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Location": "./"
+        }
+      }
+    },
+    {
+      "name": "traversal_contained",
+      "input": {
+        "method": "GET",
+        "path": "/../../etc/passwd",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 200,
+        "served": "index.html",
+        "headers": {
+          "Cache-Control": "no-cache",
+          "Content-Type": "text/html; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "post_refused",
+      "input": {
+        "method": "POST",
+        "path": "/sheets",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 405,
+        "body": "method not allowed\n",
+        "headers": {
+          "Allow": "GET, HEAD",
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "post_to_real_file_refused",
+      "input": {
+        "method": "POST",
+        "path": "/app.css",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 405,
+        "body": "method not allowed\n",
+        "headers": {
+          "Allow": "GET, HEAD",
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "delete_refused",
+      "input": {
+        "method": "DELETE",
+        "path": "/",
+        "files": {
+          ".env": "SECRET=1",
+          "_app/immutable/entry/start.a1.js": "export const start=1",
+          "app.css": "body{margin:0}",
+          "assets/logo.b2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+          "docs/guide.json": "{\"guide\":true}",
+          "index.html": "<!doctype html><title>app</title>"
+        }
+      },
+      "want": {
+        "status": 405,
+        "body": "method not allowed\n",
+        "headers": {
+          "Allow": "GET, HEAD",
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    },
+    {
+      "name": "no_index_no_fallback",
+      "input": {
+        "method": "GET",
+        "path": "/sheets",
+        "files": {
+          "app.css": "body{margin:0}"
+        }
+      },
+      "want": {
+        "status": 404,
+        "body": "404 page not found\n",
+        "headers": {
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,324 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "json_decode",
+  "cases": [
+    {
+      "name": "valid",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "valid_trailing_whitespace",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3} \n\t",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "valid_partial_object",
+      "input": {
+        "body": "{\"name\":\"budget\"}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 0
+        }
+      }
+    },
+    {
+      "name": "unknown_field",
+      "input": {
+        "body": "{\"name\":\"budget\",\"owner\":\"x\"}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid JSON body"
+      }
+    },
+    {
+      "name": "field_name_matched_case_insensitively",
+      "input": {
+        "body": "{\"NAME\":\"budget\"}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 0
+        }
+      }
+    },
+    {
+      "name": "trailing_object",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}{}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "request body must contain a single JSON object"
+      }
+    },
+    {
+      "name": "trailing_garbage",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3} x",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "request body must contain a single JSON object"
+      }
+    },
+    {
+      "name": "empty_body",
+      "input": {
+        "body": "",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid JSON body"
+      }
+    },
+    {
+      "name": "not_json",
+      "input": {
+        "body": "name=budget",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid JSON body"
+      }
+    },
+    {
+      "name": "array_not_object",
+      "input": {
+        "body": "[1,2]",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid JSON body"
+      }
+    },
+    {
+      "name": "wrong_field_type",
+      "input": {
+        "body": "{\"count\":\"three\"}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid JSON body"
+      }
+    },
+    {
+      "name": "null_body",
+      "input": {
+        "body": "null",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "",
+          "count": 0
+        }
+      }
+    },
+    {
+      "name": "at_limit",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 27,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "over_limit",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 26,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 413,
+        "code": "resource_exhausted",
+        "message": "request body too large"
+      }
+    },
+    {
+      "name": "wrong_content_type_still_decoded",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": false,
+        "compressed": false,
+        "limit": 0,
+        "content_type": "text/plain"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "gzip_valid",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": true,
+        "compressed": true,
+        "limit": 1048576,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "gzip_at_decompressed_limit",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": true,
+        "compressed": true,
+        "limit": 27,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 200,
+        "decoded": {
+          "name": "budget",
+          "count": 3
+        }
+      }
+    },
+    {
+      "name": "gzip_over_decompressed_limit",
+      "input": {
+        "body": "{\"name\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+        "gzip": true,
+        "compressed": true,
+        "limit": 1024,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 413,
+        "code": "resource_exhausted",
+        "message": "decompressed body too large"
+      }
+    },
+    {
+      "name": "gzip_unknown_field",
+      "input": {
+        "body": "{\"owner\":\"x\"}",
+        "gzip": true,
+        "compressed": true,
+        "limit": 1048576,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid JSON body"
+      }
+    },
+    {
+      "name": "gzip_plain_body",
+      "input": {
+        "body": "{\"name\":\"budget\",\"count\":3}",
+        "gzip": true,
+        "compressed": false,
+        "limit": 1048576,
+        "content_type": "application/json"
+      },
+      "want": {
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "invalid gzip body"
+      }
+    }
+  ]
+}

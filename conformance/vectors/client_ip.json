@@ -1,0 +1,333 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "client_ip",
+  "cases": [
+    {
+      "name": "unset_trusts_private",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": ""
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "private",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "loopback_peer_trusted",
+      "input": {
+        "remote_addr": "127.0.0.1:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "ipv4_mapped_peer_trusted",
+      "input": {
+        "remote_addr": "[::ffff:10.0.0.2]:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "ipv6_private_peer_trusted",
+      "input": {
+        "remote_addr": "[fd00::2]:5555",
+        "headers": {
+          "X-Forwarded-For": "2001:db8::7"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "2001:db8::7"
+      }
+    },
+    {
+      "name": "untrusted_peer_forged_header_ignored",
+      "input": {
+        "remote_addr": "203.0.113.9:4444",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "203.0.113.9:4444"
+      }
+    },
+    {
+      "name": "trusted_peer_without_header",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "10.0.0.2:5555"
+      }
+    },
+    {
+      "name": "rightmost_untrusted_hop_wins",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "192.0.2.66, 198.51.100.7, 10.0.0.3"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "hop_with_port",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7:6000"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "unparsable_rightmost_hop_stops_the_walk",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7, garbage"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "10.0.0.2:5555"
+      }
+    },
+    {
+      "name": "unparsable_hop_left_of_client_ignored",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "garbage, 198.51.100.7"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "only_trusted_hops",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "10.0.0.3, 10.0.0.4"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "10.0.0.2:5555"
+      }
+    },
+    {
+      "name": "none_trusts_nothing",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "none"
+      },
+      "want": {
+        "ip": "10.0.0.2:5555"
+      }
+    },
+    {
+      "name": "literal_cidr",
+      "input": {
+        "remote_addr": "192.0.2.10:80",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "192.0.2.0/24"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "literal_address",
+      "input": {
+        "remote_addr": "192.0.2.10:80",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "192.0.2.10"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "literal_cidr_excludes_private",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "192.0.2.0/24"
+      },
+      "want": {
+        "ip": "10.0.0.2:5555"
+      }
+    },
+    {
+      "name": "cloudflare_edge_without_cloudflare_set",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7, 173.245.48.1"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "173.245.48.1"
+      }
+    },
+    {
+      "name": "cloudflare_chain_walked",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7, 173.245.48.1"
+        },
+        "trusted_proxies": "private,cloudflare"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "cloudflare_replaced_chain_reads_header",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "Cf-Connecting-Ip": "198.51.100.7",
+          "X-Forwarded-For": "173.245.48.1"
+        },
+        "trusted_proxies": "private,cloudflare"
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "cloudflare_header_forged_from_origin",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "Cf-Connecting-Ip": "1.1.1.1",
+          "X-Forwarded-For": "203.0.113.50"
+        },
+        "trusted_proxies": "private,cloudflare"
+      },
+      "want": {
+        "ip": "203.0.113.50"
+      }
+    },
+    {
+      "name": "cloudflare_header_ignored_without_cloudflare_set",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "Cf-Connecting-Ip": "198.51.100.7",
+          "X-Forwarded-For": "173.245.48.1"
+        },
+        "trusted_proxies": "private"
+      },
+      "want": {
+        "ip": "173.245.48.1"
+      }
+    },
+    {
+      "name": "cloudflare_header_unparsable",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "Cf-Connecting-Ip": "not-an-ip",
+          "X-Forwarded-For": "173.245.48.1"
+        },
+        "trusted_proxies": "private,cloudflare"
+      },
+      "want": {
+        "ip": "10.0.0.2:5555"
+      }
+    },
+    {
+      "name": "cloudflare_header_from_untrusted_peer",
+      "input": {
+        "remote_addr": "203.0.113.9:4444",
+        "headers": {
+          "Cf-Connecting-Ip": "198.51.100.7",
+          "X-Forwarded-For": "173.245.48.1"
+        },
+        "trusted_proxies": "private,cloudflare"
+      },
+      "want": {
+        "ip": "203.0.113.9:4444"
+      }
+    },
+    {
+      "name": "set_names_ignore_case",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7, 173.245.48.1"
+        },
+        "trusted_proxies": " Private , CLOUDFLARE "
+      },
+      "want": {
+        "ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "invalid_entry_refused",
+      "input": {
+        "remote_addr": "10.0.0.2:5555",
+        "headers": {
+          "X-Forwarded-For": "198.51.100.7"
+        },
+        "trusted_proxies": "private,not-an-ip"
+      },
+      "want": {
+        "error": "env: TRUSTED_PROXIES takes CIDR blocks, IP addresses, or the names private and cloudflare: invalid CIDR address or IP: not-an-ip"
+      }
+    }
+  ]
+}
