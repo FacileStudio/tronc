@@ -142,6 +142,7 @@ env/          the shared configuration plus typed variable helpers
 apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
 bulle/        a client for Bulle's Ideas API, and MountIdeas for the app's own /api/ideas routes
 mcp/          the remote MCP server kit: Mount, tools, confirmations; mcptest/ checks it
+conformance/  JSON test vectors built from the packages above, for ports such as tronc-rs
 migrate/      SEPARATE MODULE — goose migrations and a `migrate` subcommand
 testdb/       SEPARATE MODULE — a real Postgres for tests, one schema per binary
 docs/         architecture, configuration, development, API reference

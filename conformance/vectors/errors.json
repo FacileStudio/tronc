@@ -1,0 +1,323 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "errors",
+  "cases": [
+    {
+      "name": "invalid_argument",
+      "input": {
+        "constructor": "Invalid",
+        "code": "invalid_argument",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 400,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"invalid_argument\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "unauthenticated",
+      "input": {
+        "constructor": "Unauthorized",
+        "code": "unauthenticated",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 401,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"unauthenticated\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "payment_required",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "permission_denied",
+      "input": {
+        "constructor": "Forbidden",
+        "code": "permission_denied",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 403,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"permission_denied\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "not_found",
+      "input": {
+        "constructor": "NotFound",
+        "code": "not_found",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 404,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"not_found\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "already_exists",
+      "input": {
+        "constructor": "Conflict",
+        "code": "already_exists",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 409,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"already_exists\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "failed_precondition",
+      "input": {
+        "constructor": "Failed",
+        "code": "failed_precondition",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 412,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"failed_precondition\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "resource_exhausted",
+      "input": {
+        "constructor": "TooLarge",
+        "code": "resource_exhausted",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 413,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"resource_exhausted\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "rate_limited",
+      "input": {
+        "constructor": "RateLimited",
+        "code": "rate_limited",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 429,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "input": {
+        "constructor": "NotAllowed",
+        "code": "method_not_allowed",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 405,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"method_not_allowed\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "unavailable",
+      "input": {
+        "constructor": "Unavailable",
+        "code": "unavailable",
+        "message": "something went wrong"
+      },
+      "want": {
+        "status": 503,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"unavailable\",\"message\":\"something went wrong\"}}\n"
+      }
+    },
+    {
+      "name": "internal_hides_cause",
+      "input": {
+        "constructor": "Internal",
+        "code": "internal",
+        "message": "could not save",
+        "cause": "pq: connection refused"
+      },
+      "want": {
+        "status": 500,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"internal\",\"message\":\"could not save\"}}\n"
+      }
+    },
+    {
+      "name": "unknown_code_is_500",
+      "input": {
+        "code": "teapot",
+        "message": "short and stout"
+      },
+      "want": {
+        "status": 500,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"teapot\",\"message\":\"short and stout\"}}\n"
+      }
+    },
+    {
+      "name": "empty_code_is_500",
+      "input": {
+        "message": "no code"
+      },
+      "want": {
+        "status": 500,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"\",\"message\":\"no code\"}}\n"
+      }
+    },
+    {
+      "name": "raw_error_is_internal",
+      "input": {
+        "message": "pq: password authentication failed",
+        "raw": true
+      },
+      "want": {
+        "status": 500,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"internal\",\"message\":\"internal server error\"}}\n"
+      }
+    },
+    {
+      "name": "wrapped_error_keeps_code",
+      "input": {
+        "constructor": "NotFound",
+        "code": "not_found",
+        "message": "space not found",
+        "wrapped": true
+      },
+      "want": {
+        "status": 404,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"not_found\",\"message\":\"space not found\"}}\n"
+      }
+    },
+    {
+      "name": "message_html_escaped",
+      "input": {
+        "constructor": "Invalid",
+        "code": "invalid_argument",
+        "message": "<b>name</b> & more"
+      },
+      "want": {
+        "status": 400,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"invalid_argument\",\"message\":\"\\u003cb\\u003ename\\u003c/b\\u003e \\u0026 more\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_https",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "https://ardoise.facile.studio/billing"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\",\"upgrade_url\":\"https://ardoise.facile.studio/billing\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_path",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "/billing?plan=pro"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\",\"upgrade_url\":\"/billing?plan=pro\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_javascript_dropped",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "javascript:alert(1)"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_protocol_relative_dropped",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "//evil.example/billing"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_http_dropped",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "http://ardoise.facile.studio/billing"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_credentials_dropped",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "https://user:pass@ardoise.facile.studio/billing"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\"}}\n"
+      }
+    },
+    {
+      "name": "upgrade_url_backslash_dropped",
+      "input": {
+        "constructor": "PaymentRequired",
+        "code": "payment_required",
+        "message": "plan required",
+        "upgrade_url": "/\\evil.example"
+      },
+      "want": {
+        "status": 402,
+        "content_type": "application/json",
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"plan required\"}}\n"
+      }
+    }
+  ]
+}

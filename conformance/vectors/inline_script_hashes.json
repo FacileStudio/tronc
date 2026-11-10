@@ -1,0 +1,232 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "inline_script_hashes",
+  "cases": [
+    {
+      "name": "one_inline_script",
+      "input": {
+        "html": "<!doctype html><html><head><script>import('/_app/immutable/entry/start.a1.js')</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-jSsEwLDnHxYtZSJyg3Lb4g9inR5nOO/NHtV7GOBL/nM='"
+        ]
+      }
+    },
+    {
+      "name": "hashes_sorted",
+      "input": {
+        "html": "<!doctype html><html><head><script>b()</script><script>a()</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-cf242PFc/kb7xD0Qzhsmd9vvRkc+cWFmbi+k+YvtdKc='",
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='"
+        ]
+      }
+    },
+    {
+      "name": "duplicates_removed",
+      "input": {
+        "html": "<!doctype html><html><head><script>a()</script><script>a()</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='"
+        ]
+      }
+    },
+    {
+      "name": "attributes_allowed",
+      "input": {
+        "html": "<!doctype html><html><head><script type=\"module\" nonce=x>import('/_app/immutable/entry/start.a1.js')</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-jSsEwLDnHxYtZSJyg3Lb4g9inR5nOO/NHtV7GOBL/nM='"
+        ]
+      }
+    },
+    {
+      "name": "uppercase_tag",
+      "input": {
+        "html": "<!doctype html><html><head><SCRIPT>a()</SCRIPT></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='"
+        ]
+      }
+    },
+    {
+      "name": "whitespace_kept_in_hash",
+      "input": {
+        "html": "<!doctype html><html><head><script>\n  a()\n</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-XrdTP8w9c7chErqwKZtQigpcknxM1M8OQbe/Sw5+Yls='"
+        ]
+      }
+    },
+    {
+      "name": "crlf_normalised",
+      "input": {
+        "html": "<!doctype html><html><head><script>\r\n  a()\r\n</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-XrdTP8w9c7chErqwKZtQigpcknxM1M8OQbe/Sw5+Yls='"
+        ]
+      }
+    },
+    {
+      "name": "lone_cr_normalised",
+      "input": {
+        "html": "<!doctype html><html><head><script>\r  a()\r</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-XrdTP8w9c7chErqwKZtQigpcknxM1M8OQbe/Sw5+Yls='"
+        ]
+      }
+    },
+    {
+      "name": "closing_tag_with_space",
+      "input": {
+        "html": "<!doctype html><html><head><script>a()</script ></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='"
+        ]
+      }
+    },
+    {
+      "name": "no_scripts",
+      "input": {
+        "html": "<!doctype html><html><head><title>x</title></head><body></body></html>"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "src_script_skipped",
+      "input": {
+        "html": "<!doctype html><html><head><script src=\"/app.js\"></script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "src_attribute_uppercase_skipped",
+      "input": {
+        "html": "<!doctype html><html><head><script SRC=/app.js>a()</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "empty_script_skipped",
+      "input": {
+        "html": "<!doctype html><html><head><script></script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "quoted_gt_does_not_end_tag",
+      "input": {
+        "html": "<!doctype html><html><head><script data-x=\"a>b\">a()</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='"
+        ]
+      }
+    },
+    {
+      "name": "quoted_src_text_is_not_src",
+      "input": {
+        "html": "<!doctype html><html><head><script data-x='src=/x.js'>a()</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='"
+        ]
+      }
+    },
+    {
+      "name": "similar_tag_name_ignored",
+      "input": {
+        "html": "<!doctype html><html><head><scripts>a()</scripts><script-x>b()</script-x></head><body></body></html>"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "false_closing_tag_skipped",
+      "input": {
+        "html": "<!doctype html><html><head><script>a('</scripts>')</script></head><body></body></html>"
+      },
+      "want": {
+        "hashes": [
+          "'sha256-obBhvc6PJVf9HUk1DtHIlVY4y50dXUcd8CKDrS6SCLw='"
+        ]
+      }
+    },
+    {
+      "name": "unclosed_script_ignored",
+      "input": {
+        "html": "<!doctype html><html><head><script>a()</head><body></body></html>"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "unterminated_tag_ignored",
+      "input": {
+        "html": "<script data-x=\"a()"
+      },
+      "want": {
+        "hashes": []
+      }
+    },
+    {
+      "name": "every_html_file_scanned",
+      "input": {
+        "html": "<!doctype html><html><head><script>a()</script></head><body></body></html>",
+        "files": {
+          "UPPER.HTML": "<!doctype html><html><head><script>c()</script></head><body></body></html>",
+          "sheets/index.html": "<!doctype html><html><head><script>b()</script></head><body></body></html>"
+        }
+      },
+      "want": {
+        "hashes": [
+          "'sha256-cf242PFc/kb7xD0Qzhsmd9vvRkc+cWFmbi+k+YvtdKc='",
+          "'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4='",
+          "'sha256-uv6BXxguRKhBqgeOtcyTvppA2Vttceh37dUo7xwS8Ug='"
+        ]
+      }
+    },
+    {
+      "name": "non_html_files_ignored",
+      "input": {
+        "html": "<!doctype html><html><head></head><body></body></html>",
+        "files": {
+          "app.js": "<script>a()</script>",
+          "legacy.htm": "<!doctype html><html><head><script>b()</script></head><body></body></html>"
+        }
+      },
+      "want": {
+        "hashes": []
+      }
+    }
+  ]
+}

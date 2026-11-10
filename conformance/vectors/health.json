@@ -1,0 +1,173 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "health",
+  "cases": [
+    {
+      "name": "live",
+      "input": {
+        "method": "GET",
+        "path": "/health",
+        "db_ok": true
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ok\"}\n"
+      }
+    },
+    {
+      "name": "live_ignores_a_down_db",
+      "input": {
+        "method": "GET",
+        "path": "/health",
+        "db_ok": false
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ok\"}\n"
+      }
+    },
+    {
+      "name": "ready",
+      "input": {
+        "method": "GET",
+        "path": "/ready",
+        "db_ok": true
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ready\"}\n"
+      }
+    },
+    {
+      "name": "ready_db_down",
+      "input": {
+        "method": "GET",
+        "path": "/ready",
+        "db_ok": false
+      },
+      "want": {
+        "status": 503,
+        "content_type": "application/json",
+        "body": "{\"status\":\"not_ready\"}\n"
+      }
+    },
+    {
+      "name": "ready_without_checks",
+      "input": {
+        "method": "GET",
+        "path": "/ready",
+        "db_ok": null
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ready\"}\n"
+      }
+    },
+    {
+      "name": "api_live",
+      "input": {
+        "method": "GET",
+        "path": "/api/health",
+        "db_ok": true
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ok\"}\n"
+      }
+    },
+    {
+      "name": "api_live_ignores_a_down_db",
+      "input": {
+        "method": "GET",
+        "path": "/api/health",
+        "db_ok": false
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ok\"}\n"
+      }
+    },
+    {
+      "name": "api_ready",
+      "input": {
+        "method": "GET",
+        "path": "/api/ready",
+        "db_ok": true
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"status\":\"ready\"}\n"
+      }
+    },
+    {
+      "name": "api_ready_db_down",
+      "input": {
+        "method": "GET",
+        "path": "/api/ready",
+        "db_ok": false
+      },
+      "want": {
+        "status": 503,
+        "content_type": "application/json",
+        "body": "{\"status\":\"not_ready\"}\n"
+      }
+    },
+    {
+      "name": "post_refused",
+      "input": {
+        "method": "POST",
+        "path": "/health",
+        "db_ok": true
+      },
+      "want": {
+        "status": 405,
+        "body": ""
+      }
+    },
+    {
+      "name": "head_refused",
+      "input": {
+        "method": "HEAD",
+        "path": "/ready",
+        "db_ok": true
+      },
+      "want": {
+        "status": 405,
+        "body": ""
+      }
+    },
+    {
+      "name": "unknown_path",
+      "input": {
+        "method": "GET",
+        "path": "/healthz",
+        "db_ok": true
+      },
+      "want": {
+        "status": 404,
+        "content_type": "text/plain; charset=utf-8",
+        "body": "404 page not found\n"
+      }
+    },
+    {
+      "name": "trailing_slash_not_mounted",
+      "input": {
+        "method": "GET",
+        "path": "/health/",
+        "db_ok": true
+      },
+      "want": {
+        "status": 404,
+        "content_type": "text/plain; charset=utf-8",
+        "body": "404 page not found\n"
+      }
+    }
+  ]
+}

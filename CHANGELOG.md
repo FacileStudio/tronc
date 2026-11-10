@@ -6,6 +6,15 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **Conformance vectors.** `conformance/vectors/*.json` pins what `errors`, `httpjson`, `health`,
+  the request log, the security headers, the client-IP rule, `spa` and `spa.InlineScriptHashes`
+  answer today, in a JSON envelope (`source`, `subject`, `cases`) a port reads as its
+  specification. `go test ./conformance` builds every case from the real packages and fails on
+  any drift; `go test ./conformance -update` rewrites the files after a deliberate change.
+  tronc-rs copies them at a tag.
+
 ### Changed
 
 - Licence: tronc is now licensed under `MIT` (see `LICENSE`); before this, the repository carried no licence. The nested `migrate` and `testdb` modules carry the same file.

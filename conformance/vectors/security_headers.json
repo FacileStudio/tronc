@@ -1,0 +1,553 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "security_headers",
+  "cases": [
+    {
+      "name": "default_report_only",
+      "input": {
+        "config": {},
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "enforced",
+      "input": {
+        "config": {
+          "csp_enforce": true
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "extra_script_src",
+      "input": {
+        "config": {
+          "csp_enforce": true,
+          "csp_sources": {
+            "script-src": [
+              "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='",
+              "'sha256-RFWPLDbv2BY+rCkDzsE+0fr8ylGr2R2faWMhq4lfEQc='"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=' 'sha256-RFWPLDbv2BY+rCkDzsE+0fr8ylGr2R2faWMhq4lfEQc='; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "extra_sources_deduplicated",
+      "input": {
+        "config": {
+          "csp_enforce": true,
+          "csp_sources": {
+            "connect-src": [
+              "'self'",
+              "wss://feuilles.facile.studio",
+              "wss://feuilles.facile.studio"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self' wss://feuilles.facile.studio; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "new_directives_appended_in_name_order",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "font-src": [
+              "data:"
+            ],
+            "script-src": [
+              "'wasm-unsafe-eval'"
+            ],
+            "worker-src": [
+              "blob:"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src data:; worker-src blob:",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "none_default_replaced",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "object-src": [
+              "'self'"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'self'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "framing_opened_drops_frame_options",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "frame-ancestors": [
+              "https://bulle.facile.studio"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors https://bulle.facile.studio; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://bulle.facile.studio; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff"
+        }
+      }
+    },
+    {
+      "name": "framing_explicit_none_keeps_frame_options",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "frame-ancestors": [
+              "'none'"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "report_uri",
+      "input": {
+        "config": {
+          "csp_report_uri": "/api/csp-report"
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; report-uri /api/csp-report",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "permissions_allow",
+      "input": {
+        "config": {
+          "allow": [
+            "camera",
+            "fullscreen"
+          ]
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), fullscreen=(self)",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "opener_policy_popups",
+      "input": {
+        "config": {
+          "cross_origin_opener_policy": "same-origin-allow-popups"
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "hsts_on_tls",
+      "input": {
+        "config": {},
+        "remote_addr": "203.0.113.9:4444",
+        "tls": true
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "hsts_exclude_subdomains",
+      "input": {
+        "config": {
+          "hsts_exclude_subdomains": true
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": true
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Strict-Transport-Security": "max-age=31536000",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "hsts_from_trusted_proxy",
+      "input": {
+        "config": {},
+        "remote_addr": "10.0.0.2:5555",
+        "tls": false,
+        "forwarded_proto": [
+          "https"
+        ]
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "hsts_proto_case_insensitive",
+      "input": {
+        "config": {},
+        "remote_addr": "10.0.0.2:5555",
+        "tls": false,
+        "forwarded_proto": [
+          "HTTPS"
+        ]
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "no_hsts_from_untrusted_peer",
+      "input": {
+        "config": {},
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false,
+        "forwarded_proto": [
+          "https"
+        ]
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "no_hsts_when_nearest_hop_is_http",
+      "input": {
+        "config": {},
+        "remote_addr": "10.0.0.2:5555",
+        "tls": false,
+        "forwarded_proto": [
+          "https, http"
+        ]
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "hsts_reads_the_last_header_line",
+      "input": {
+        "config": {},
+        "remote_addr": "10.0.0.2:5555",
+        "tls": false,
+        "forwarded_proto": [
+          "http",
+          "http, https"
+        ]
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "no_hsts_over_plain_http",
+      "input": {
+        "config": {},
+        "remote_addr": "10.0.0.2:5555",
+        "tls": false
+      },
+      "want": {
+        "headers": {
+          "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+          "Content-Security-Policy-Report-Only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY"
+        }
+      }
+    },
+    {
+      "name": "refuses_source_with_semicolon",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "script-src": [
+              "'self'; script-src *"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: CSP source \"'self'; script-src *\" would corrupt the policy"
+      }
+    },
+    {
+      "name": "refuses_source_with_comma",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "img-src": [
+              "a.example,b.example"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: CSP source \"a.example,b.example\" would corrupt the policy"
+      }
+    },
+    {
+      "name": "refuses_empty_source",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "img-src": [
+              ""
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: CSP source \"\" would corrupt the policy"
+      }
+    },
+    {
+      "name": "refuses_bad_directive_name",
+      "input": {
+        "config": {
+          "csp_sources": {
+            "Script-Src": [
+              "'self'"
+            ]
+          }
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: CSP directive \"Script-Src\" is not a directive name"
+      }
+    },
+    {
+      "name": "refuses_bad_report_uri",
+      "input": {
+        "config": {
+          "csp_report_uri": "/report here"
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: CSP report-uri \"/report here\" would corrupt the policy"
+      }
+    },
+    {
+      "name": "refuses_bad_feature",
+      "input": {
+        "config": {
+          "allow": [
+            "camera=*"
+          ]
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: Permissions-Policy feature \"camera=*\" is not a feature name"
+      }
+    },
+    {
+      "name": "refuses_unknown_opener_policy",
+      "input": {
+        "config": {
+          "cross_origin_opener_policy": "none"
+        },
+        "remote_addr": "203.0.113.9:4444",
+        "tls": false
+      },
+      "want": {
+        "panic": "tronc/middleware: Cross-Origin-Opener-Policy \"none\" is not one of [same-origin same-origin-allow-popups noopener-allow-popups unsafe-none]"
+      }
+    }
+  ]
+}

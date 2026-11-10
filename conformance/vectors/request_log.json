@@ -1,0 +1,365 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.20.1",
+  "subject": "request_log",
+  "cases": [
+    {
+      "name": "no_query",
+      "input": {
+        "url": "/api/sheets",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/sheets",
+        "query": "",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "plain_query_kept_verbatim",
+      "input": {
+        "url": "/api/sheets?sort=name&page=2",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/sheets",
+        "query": "sort=name&page=2",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "token_redacted",
+      "input": {
+        "url": "/api/sheets?token=s3cr3t",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/sheets",
+        "query": "token=%5Bredacted%5D",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "key_match_ignores_case",
+      "input": {
+        "url": "/api/sheets?Access_Token=s3cr3t",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/sheets",
+        "query": "Access_Token=%5Bredacted%5D",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "every_sensitive_key",
+      "input": {
+        "url": "/api/x?access_token=1&api_key=2&apikey=3&code=4&id_token=5&key=6&password=7&refresh_token=8&secret=9&signature=10&token=11",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "access_token=%5Bredacted%5D&api_key=%5Bredacted%5D&apikey=%5Bredacted%5D&code=%5Bredacted%5D&id_token=%5Bredacted%5D&key=%5Bredacted%5D&password=%5Bredacted%5D&refresh_token=%5Bredacted%5D&secret=%5Bredacted%5D&signature=%5Bredacted%5D&token=%5Bredacted%5D",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "redaction_reencodes_sorted",
+      "input": {
+        "url": "/api/auth/callback?state=xyz&code=abc&b=2",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/auth/callback",
+        "query": "b=2&code=%5Bredacted%5D&state=xyz",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "repeated_sensitive_key_collapsed",
+      "input": {
+        "url": "/api/x?token=a&token=b",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "token=%5Bredacted%5D",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "sensitive_key_without_value",
+      "input": {
+        "url": "/api/x?token",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "token=%5Bredacted%5D",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "similar_key_not_redacted",
+      "input": {
+        "url": "/api/x?tokens=a&my_token=b",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "tokens=a&my_token=b",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "unparsable_query",
+      "input": {
+        "url": "/api/x?token=%zz",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "[unparsable]",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "semicolon_query_unparsable",
+      "input": {
+        "url": "/api/x?a=1;token=b",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "[unparsable]",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "health_is_quiet",
+      "input": {
+        "url": "/health",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/health",
+        "query": "",
+        "kind": "health",
+        "level": "DEBUG",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "api_ready_is_quiet",
+      "input": {
+        "url": "/api/ready?token=s3cr3t",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api/ready",
+        "query": "token=%5Bredacted%5D",
+        "kind": "health",
+        "level": "DEBUG",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "static_is_quiet",
+      "input": {
+        "url": "/_app/immutable/entry.js",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/_app/immutable/entry.js",
+        "query": "",
+        "kind": "static",
+        "level": "DEBUG",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "prefix_needs_a_boundary",
+      "input": {
+        "url": "/apix/sheets",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/apix/sheets",
+        "query": "",
+        "kind": "static",
+        "level": "DEBUG",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "bare_prefix_is_api",
+      "input": {
+        "url": "/api",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200
+      },
+      "want": {
+        "path": "/api",
+        "query": "",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "server_error_logged_at_error",
+      "input": {
+        "url": "/_app/immutable/entry.js",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 502
+      },
+      "want": {
+        "path": "/_app/immutable/entry.js",
+        "query": "",
+        "kind": "static",
+        "level": "ERROR",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "client_error_stays_info",
+      "input": {
+        "url": "/api/sheets",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 404
+      },
+      "want": {
+        "path": "/api/sheets",
+        "query": "",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "root_api_prefix",
+      "input": {
+        "url": "/sheets",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": "",
+        "status": 200
+      },
+      "want": {
+        "path": "/sheets",
+        "query": "",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "root_api_prefix_health",
+      "input": {
+        "url": "/ready",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": "",
+        "status": 200
+      },
+      "want": {
+        "path": "/ready",
+        "query": "",
+        "kind": "health",
+        "level": "DEBUG",
+        "client_ip": "192.0.2.1:1234"
+      }
+    },
+    {
+      "name": "client_ip_cloudflare_header_first",
+      "input": {
+        "url": "/api/x",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200,
+        "headers": {
+          "Cf-Connecting-Ip": "198.51.100.7",
+          "X-Forwarded-For": "203.0.113.1"
+        }
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "198.51.100.7"
+      }
+    },
+    {
+      "name": "client_ip_first_forwarded_hop",
+      "input": {
+        "url": "/api/x",
+        "remote_addr": "192.0.2.1:1234",
+        "api_prefix": null,
+        "status": 200,
+        "headers": {
+          "X-Forwarded-For": " 203.0.113.1 , 10.0.0.2"
+        }
+      },
+      "want": {
+        "path": "/api/x",
+        "query": "",
+        "kind": "api",
+        "level": "INFO",
+        "client_ip": "203.0.113.1"
+      }
+    }
+  ]
+}
