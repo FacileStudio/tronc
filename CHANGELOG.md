@@ -6,6 +6,17 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **`bulle`: a client for Bulle's Ideas API, and `MountIdeas`.** Every suite app is getting an
+  Ideas page whose ideas Bulle generates and runs. `bulle.Client` covers the list, generate, run,
+  run status, decide and dismiss routes, plus `Call` for later AI routes, with paths built from
+  escaped segments. A 402 is `*PlanRequired` (bare body or envelope), other 4xx keep their status
+  in `*StatusError`, and 5xx, timeouts and network errors wrap `ErrUnreachable`. The token comes
+  from a `func(ctx) (string, error)`, so porte's exchange plugs in without tronc importing porte.
+  `MountIdeas` serves `/ideas*` to the app's own frontend in a few lines, with the plan pre-check
+  (`AIAccess`) and the active space (`Space`) supplied by the app. No new dependency.
+
 ## [0.17.1] - 2026-11-06
 
 ### Changed
