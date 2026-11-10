@@ -164,3 +164,7 @@ them changes: importing `tronc` pulls chi and go-sdk and nothing else. See
 
 Part of the [Facile Suite](https://facile.studio) — self-hosted tools for creative studios
 and freelancers. One login, zero cloud dependency.
+
+## License
+
+tronc is licensed under the [MIT License](LICENSE).

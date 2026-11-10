@@ -6,6 +6,10 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Changed
+
+- Licence: tronc is now licensed under `MIT` (see `LICENSE`); before this, the repository carried no licence. The nested `migrate` and `testdb` modules carry the same file.
+
 ## [0.21.0] - 2026-11-10
 
 ### Added
