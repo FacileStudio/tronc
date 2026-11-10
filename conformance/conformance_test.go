@@ -18,7 +18,7 @@ import (
 	"testing"
 )
 
-const source = "github.com/FacileStudio/tronc@v0.20.1"
+const source = "github.com/FacileStudio/tronc@871cd90"
 
 var update = flag.Bool("update", false, "rewrite conformance/vectors from the code")
 
