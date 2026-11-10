@@ -219,3 +219,20 @@ func TestConfirmPageIsPersonal(t *testing.T) {
 		t.Fatalf("the owner confirms once, got %v and %d deletes", err, n.deleted["a"])
 	}
 }
+
+// TestReadOnlyConformance runs the kit against a server whose only scope is
+// the read scope, the shape of a search engine's MCP server.
+func TestReadOnlyConformance(t *testing.T) {
+	n := &notes{text: map[string]string{}, deleted: map[string]int{}}
+	router := chi.NewRouter()
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+	err := mcp.Mount(router, mcp.Options{
+		Name: "notes", Title: "Notes", Version: "test", Resource: srv.URL + "/mcp", Issuer: "https://issuer.example",
+		Verifier: verify, Scopes: mcp.Scopes{Read: "notes.read"}, Tools: n.tools()[1:2],
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mcptest.Run(t, mcptest.Config{URL: srv.URL + "/mcp", Token: func(_ testing.TB, _ ...string) string { return "u1|notes.read" }})
+}

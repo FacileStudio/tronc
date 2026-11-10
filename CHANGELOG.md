@@ -6,6 +6,14 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **Read-only MCP servers.** `mcp.Options.Scopes` may set `Read` alone when every tool is
+  read-only: the metadata then lists only that scope and the write gate is not mounted. A tool
+  that is not read-only on such a server is refused at boot. `mcptest.Run` accepts metadata with
+  one scope and fails when a server listing no write scope serves a write tool. sonar's search
+  server is the first user, with `sonar.read` as its only scope.
+
 ## [0.19.0] - 2026-11-10
 
 ### Added
