@@ -14,6 +14,12 @@ while on `v0`, a breaking change bumps the minor.
   one scope and fails when a server listing no write scope serves a write tool. sonar's search
   server is the first user, with `sonar.read` as its only scope.
 
+### Fixed
+
+- **`mcp.Failure` keeps plan refusals actionable.** A `payment_required` error, such as an
+  exhausted daily quota, kept only the generic "could not finish" text. It now keeps its message
+  and appends the upgrade page from `WithUpgradeURL`, so the model can send the user there.
+
 ## [0.19.0] - 2026-11-10
 
 ### Added

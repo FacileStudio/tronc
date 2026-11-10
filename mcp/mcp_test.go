@@ -99,6 +99,10 @@ func TestFailureKeepsOnlyActionableText(t *testing.T) {
 	if got := Failure(errors.Internal("db down", context.Canceled), "x"); !stderrors.Is(got, ErrUnavailable) {
 		t.Errorf("internal: got %q", got)
 	}
+	quota := errors.New("payment_required", "you used today's searches", nil).WithUpgradeURL("https://sso.example/billing")
+	if got := Failure(quota, "x"); got.Error() != "You used today's searches. Upgrade at https://sso.example/billing" {
+		t.Errorf("payment_required: got %q", got)
+	}
 	if Failure(nil, "x") != nil {
 		t.Error("nil must stay nil")
 	}
