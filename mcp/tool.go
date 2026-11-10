@@ -123,7 +123,7 @@ func callOutcome(result *sdk.CallToolResult, err error) string {
 
 // register checks every tool and adds it to the server. tools/list returns
 // them sorted by name, whatever the order here.
-func (s *server) register(tools []Tool) error {
+func (s *Server) register(tools []Tool) error {
 	prefix := s.opts.Name + "_"
 	seen := map[string]bool{}
 	for _, tool := range tools {
