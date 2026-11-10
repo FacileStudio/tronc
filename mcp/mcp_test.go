@@ -57,7 +57,7 @@ func TestBuildRefusesBadOptions(t *testing.T) {
 		"relative resource": func(o *Options) { o.Resource = "/mcp" },
 		"no issuer":         func(o *Options) { o.Issuer = "" },
 		"bad name":          func(o *Options) { o.Name = "My App" },
-		"half scopes":       func(o *Options) { o.Scopes = Scopes{Read: "app.read"} },
+		"no read scope":     func(o *Options) { o.Scopes = Scopes{Write: "app.write"} },
 	}
 	for name, change := range cases {
 		opts := good
@@ -69,6 +69,22 @@ func TestBuildRefusesBadOptions(t *testing.T) {
 	s, err := build(good)
 	if err != nil || s.opts.Scopes.Write != "app.write" || s.metadataURL != "https://app.example/.well-known/oauth-protected-resource/mcp" {
 		t.Fatalf("want default scopes and the RFC 9728 URL, got %v %+v %s", err, s.opts.Scopes, s.metadataURL)
+	}
+}
+
+// TestReadOnlyServer checks a server with only a read scope takes read-only
+// tools, advertises one scope and refuses a write tool.
+func TestReadOnlyServer(t *testing.T) {
+	opts := Options{Name: "app", Resource: "https://app.example/mcp", Issuer: "https://i.example", Verifier: acceptAll,
+		Scopes: Scopes{Read: "app.read"}}
+	opts.Tools = []Tool{NewTool(ToolSpec{Name: "app_list", Title: "T", Description: "D", Annotations: &Annotations{ReadOnly: true}}, noop)}
+	s, err := build(opts)
+	if err != nil || len(s.opts.Scopes.List()) != 1 || len(s.writes) != 0 {
+		t.Fatalf("want a read-only server with one scope, got %v %v", err, s)
+	}
+	opts.Tools = []Tool{NewTool(ToolSpec{Name: "app_write", Title: "T", Description: "D", Annotations: &Annotations{}}, noop)}
+	if _, err := build(opts); err == nil {
+		t.Error("a write tool on a read-only server must be refused")
 	}
 }
 
