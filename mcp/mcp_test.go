@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	stderrors "errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -79,7 +80,7 @@ func TestFailureKeepsOnlyActionableText(t *testing.T) {
 	if got := Failure(errors.Invalid("title is required"), "x"); got.Error() != "Title is required" {
 		t.Errorf("invalid: got %q", got)
 	}
-	if got := Failure(errors.Internal("db down", context.Canceled), "x"); got != ErrUnavailable {
+	if got := Failure(errors.Internal("db down", context.Canceled), "x"); !stderrors.Is(got, ErrUnavailable) {
 		t.Errorf("internal: got %q", got)
 	}
 	if Failure(nil, "x") != nil {
@@ -103,7 +104,7 @@ func TestSignerRefusesForgeries(t *testing.T) {
 		"other key":  func() error { _, err := (signer{key: []byte("j")}).verify(state, "7", now); return err },
 		"bare id":    func() error { _, err := s.verify("abc", "7", now); return err },
 	} {
-		if check() != ErrConfirmation {
+		if !stderrors.Is(check(), ErrConfirmation) {
 			t.Errorf("%s: want ErrConfirmation", name)
 		}
 	}
@@ -130,7 +131,7 @@ func TestClipAndFit(t *testing.T) {
 	if err := DecodeCursor(EncodeCursor(struct{ Offset int }{40}), &position); err != nil || position.Offset != 40 {
 		t.Errorf("cursor round trip: got %+v %v", position, err)
 	}
-	if DecodeCursor("!!", &position) != ErrCursor {
+	if !stderrors.Is(DecodeCursor("!!", &position), ErrCursor) {
 		t.Error("a bad cursor must be ErrCursor")
 	}
 }

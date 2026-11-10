@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -188,10 +189,10 @@ func TestChangedTargetIsNotRun(t *testing.T) {
 	mcptest.Decode(t, mcptest.Call(t, mcptest.Connect(t, resource, "u1|notes.read,notes.write", mcptest.ClientOptions{}), "notes_delete", map[string]any{"id": "a"}), &out)
 	n.text["a"] = "after"
 	id := out.ConfirmURL[strings.LastIndex(out.ConfirmURL, "=")+1:]
-	if _, err := n.confirm.Confirm(t.Context(), mcp.Caller{UserID: "u1"}, id); err != mcp.ErrChanged || n.deleted["a"] != 0 {
+	if _, err := n.confirm.Confirm(t.Context(), mcp.Caller{UserID: "u1"}, id); !stderrors.Is(err, mcp.ErrChanged) || n.deleted["a"] != 0 {
 		t.Fatalf("want ErrChanged and no delete, got %v and %d deletes", err, n.deleted["a"])
 	}
-	if _, err := n.confirm.Confirm(t.Context(), mcp.Caller{UserID: "u1"}, id); err != mcp.ErrGone {
+	if _, err := n.confirm.Confirm(t.Context(), mcp.Caller{UserID: "u1"}, id); !stderrors.Is(err, mcp.ErrGone) {
 		t.Fatalf("a stale action is closed, want ErrGone, got %v", err)
 	}
 }
@@ -204,10 +205,10 @@ func TestConfirmPageIsPersonal(t *testing.T) {
 	var out deleteOutput
 	mcptest.Decode(t, mcptest.Call(t, mcptest.Connect(t, resource, "u1|notes.read,notes.write", mcptest.ClientOptions{}), "notes_delete", map[string]any{"id": "a"}), &out)
 	id := out.ConfirmURL[strings.LastIndex(out.ConfirmURL, "=")+1:]
-	if _, err := n.confirm.Confirm(t.Context(), mcp.Caller{UserID: "u2"}, id); err != mcp.ErrGone {
+	if _, err := n.confirm.Confirm(t.Context(), mcp.Caller{UserID: "u2"}, id); !stderrors.Is(err, mcp.ErrGone) {
 		t.Fatalf("another person must not confirm, got %v", err)
 	}
-	if err := n.confirm.Dismiss(t.Context(), mcp.Caller{UserID: "u2"}, id); err != mcp.ErrGone {
+	if err := n.confirm.Dismiss(t.Context(), mcp.Caller{UserID: "u2"}, id); !stderrors.Is(err, mcp.ErrGone) {
 		t.Fatalf("another person must not dismiss, got %v", err)
 	}
 	open, _ := n.confirm.Open(t.Context(), "u1")
