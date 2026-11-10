@@ -29,12 +29,15 @@ today.
   [`migrate`](migrate/) module — so the dependency lands only on apps that have a database
 - Gives tests a real PostgreSQL, one schema per test binary, via the separate
   [`testdb`](testdb/) module
+- Mounts a remote MCP server (go-sdk, stateless, spec 2026-07-28) with token auth, RFC 9728
+  metadata, an Origin check, a write-scope gate, curated tools with required annotations, and
+  confirmations for sensitive actions; `mcp/mcptest` is its conformance kit
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| Runtime | Go 1.26, `github.com/go-chi/chi/v5` v5.2.3, and nothing else — deliberately |
+| Runtime | Go 1.26, `github.com/go-chi/chi/v5` v5.2.3 and `github.com/modelcontextprotocol/go-sdk` v1.8.0, and nothing else — deliberately |
 
 ## Install
 
@@ -138,13 +141,14 @@ spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers
 apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
 bulle/        a client for Bulle's Ideas API, and MountIdeas for the app's own /api/ideas routes
+mcp/          the remote MCP server kit: Mount, tools, confirmations; mcptest/ checks it
 migrate/      SEPARATE MODULE — goose migrations and a `migrate` subcommand
 testdb/       SEPARATE MODULE — a real Postgres for tests, one schema per binary
 docs/         architecture, configuration, development, API reference
 ```
 
 `migrate/` and `testdb/` each carry their own `go.mod`, tags and dependencies. Nothing above
-them changes: importing `tronc` still pulls chi and nothing else. See
+them changes: importing `tronc` pulls chi and go-sdk and nothing else. See
 [migrate/README.md](migrate/) and [testdb/README.md](testdb/).
 
 ## Documentation

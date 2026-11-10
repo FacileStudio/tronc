@@ -607,6 +607,95 @@ mounts, on the router the app's API lives on:
 Mount it behind the app's authentication middleware. A Bulle 401 is about the app's token, so the
 frontend gets 503, never 401. A token source error that is a tronc `*errors.Error` (porte's
 `ErrReconnect` is a 412) is passed through as it is.
+## `mcp`
+
+A remote MCP server for one app: go-sdk v1.8.0, streamable HTTP, stateless (spec 2026-07-28).
+
+```go
+func Mount(router chi.Router, opts Options) error
+func NewTool[In, Out any](spec ToolSpec, handler sdk.ToolHandlerFor[In, Out]) Tool
+func CallerOf(req *sdk.CallToolRequest) (Caller, error)
+func Failure(err error, hint string) error
+func Audit(ctx context.Context, logger *slog.Logger, e Event)
+
+func NewConfirmations(cfg ConfirmConfig) (*Confirmations, error)
+func (c *Confirmations) Request(ctx, req, kind, target, question string) (*sdk.CallToolResult, Outcome, error)
+func (c *Confirmations) Resume(ctx, req, kind string) (Outcome, error)
+func (c *Confirmations) Confirm(ctx, who Caller, id string) (Outcome, error)
+func (c *Confirmations) Dismiss(ctx, who Caller, id string) error
+func (c *Confirmations) Open(ctx, userID string) ([]Action, error)
+func (c *Confirmations) State(ctx, a Action) string
+func CanElicit(req *sdk.CallToolRequest) bool
+func Retrying(req *sdk.CallToolRequest) bool
+
+func Detailed(format string) (bool, error)
+func EncodeCursor(position any) string
+func DecodeCursor(cursor string, position any) error
+func FitCount(total int, size func(n int) int) int
+func EncodedSize(v any) int
+func Clip(text string, limit int) (string, bool)
+```
+
+`Mount` serves the endpoint at the path of `Options.Resource` and the RFC 9728 document at
+`/.well-known/oauth-protected-resource<path>` and the bare well-known path. Mount it on the root
+router, outside `/api` and outside any CSRF middleware: MCP clients send a bearer token, never a
+cookie. The order in front of the transport is Origin check, bearer check, write-scope gate,
+rate limit.
+
+- **Tokens.** `Options.Verifier` must refuse a token whose audience is not the resource. In the
+  suite it is `porte/mcpauth.Verifier`; tronc never imports porte. `Caller` reads
+  `TokenInfo.Extra["client_id"]` and `["actor"]`, the keys mcpauth sets.
+- **Tools.** Names must be `<Options.Name>_<verb>` in lowercase. Every `ToolSpec` needs a title,
+  a description and `Annotations`; all four hints go on the wire, because clients read a
+  missing destructive or open-world hint as true. A tool that is not `ReadOnly` needs the write
+  scope. tools/list is sorted by name.
+- **Errors.** Return `Failure(err, hint)` from a tool: a `not_found` keeps its message plus the
+  hint (name the tool that lists valid ids), a bad argument keeps its message, anything else
+  becomes `ErrUnavailable`.
+- **Confirmations.** A sensitive tool calls `Resume` when `Retrying(req)`, else `Request`.
+  `Request` returns an `input_required` result to return as is when the client can elicit;
+  otherwise `Outcome.Status` is `pending_confirmation` and `Outcome.ConfirmURL` the link. Put
+  `status` and `confirm_url` in the tool's output: mcptest reads those names. `Kind.Fingerprint`
+  must change whenever the target changes, so a confirmation never runs on content the person
+  did not see. The app's confirm page lists `Open`, shows `State`, and calls `Confirm` or
+  `Dismiss`; it must refuse a delegated token, because an agent never confirms its own request.
+- **Storage.** `PostgresPending{DB}` over `mcp_actions`; run `PendingSchema` with the app's
+  migrations.
+
+```go
+confirm, err := mcp.NewConfirmations(mcp.ConfirmConfig{
+	Store:      mcp.PostgresPending{DB: sqlDB},
+	Key:        stateKey,
+	ConfirmURL: "https://agenda.facile.studio/pending",
+	Kinds:      map[string]mcp.Kind{"delete_event": {Tool: "agenda_delete_event", Fingerprint: digest, Run: remove}},
+})
+verifier, err := mcpauth.Verifier(ctx, mcpauth.Config{Issuer: issuer, Resource: resource, ScopePrefix: "agenda", Identities: identities})
+err = mcp.Mount(router, mcp.Options{
+	Name: "agenda", Title: "Agenda", Version: version, Instructions: instructions,
+	Resource: resource, Issuer: issuer, Verifier: verifier, Audit: logger,
+	Tools: []mcp.Tool{
+		mcp.NewTool(mcp.ToolSpec{Name: "agenda_list_calendars", Title: "List calendars",
+			Description: "...", Annotations: &mcp.Annotations{ReadOnly: true, Idempotent: true}}, listCalendars),
+	},
+})
+```
+
+### `mcp/mcptest`
+
+```go
+func Run(t *testing.T, cfg Config)
+func NewIssuer(t testing.TB) *Issuer
+func (i *Issuer) Token(t testing.TB, resource, subject string, scopes ...string) string
+func NewPending() *Pending
+func Connect(t testing.TB, endpoint, token string, opts ClientOptions) *sdk.ClientSession
+```
+
+`Run` checks a live endpoint: 401 with `resource_metadata`, the metadata naming the resource,
+an issuer and two scopes, 405 on GET, 403 for a foreign Origin, a stable sorted tool list cached
+privately, every tool's prefix, title, hints and object schemas, the 403 `insufficient_scope`
+challenge on a write tool with a read-only token, and for each `ConfirmCase`: a link and no run
+without elicitation and for a 2025-11-25 client, no run on decline, exactly one run on accept,
+no second run on replay, and no run for a link id passed off as a signed state.
 
 ## `migrate`
 
