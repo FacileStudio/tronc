@@ -112,24 +112,20 @@ func (s Scopes) List() []string {
 	return []string{s.Read, s.Write}
 }
 
-// Mount serves the MCP endpoint at the resource's path on router, and its
-// RFC 9728 metadata at the well-known path for that resource, plus the bare
-// well-known path for clients that look only there. router is the root
-// router, outside any /api prefix and outside CSRF middleware. Mount returns
-// an error, and mounts nothing, when the options or a tool are invalid.
+// Mount builds the server and mounts it on router; see New and
+// Server.Mount. It returns an error, and mounts nothing, when the options or
+// a tool are invalid.
 func Mount(router chi.Router, opts Options) error {
-	server, err := build(opts)
+	server, err := New(opts)
 	if err != nil {
 		return err
 	}
-	router.Handle(server.path, server.endpoint())
-	router.Handle(wellKnown+server.path, server.metadata())
-	router.Handle(wellKnown, server.metadata())
+	server.Mount(router)
 	return nil
 }
 
-// server is a validated configuration with its go-sdk server.
-type server struct {
+// Server is a validated MCP server, ready to mount.
+type Server struct {
 	opts        Options
 	path        string
 	origin      string
@@ -138,8 +134,24 @@ type server struct {
 	sdk         *sdk.Server
 }
 
+// New validates opts and registers the tools, so an app can fail at boot
+// and mount later.
+func New(opts Options) (*Server, error) {
+	return build(opts)
+}
+
+// Mount serves the endpoint at the resource's path on router, and its RFC
+// 9728 metadata at the well-known path for that resource, plus the bare
+// well-known path for clients that look only there. router is the root
+// router, outside any /api prefix and outside CSRF middleware.
+func (s *Server) Mount(router chi.Router) {
+	router.Handle(s.path, s.endpoint())
+	router.Handle(wellKnown+s.path, s.metadata())
+	router.Handle(wellKnown, s.metadata())
+}
+
 // build validates opts and registers the tools.
-func build(opts Options) (*server, error) {
+func build(opts Options) (*Server, error) {
 	if err := normalize(&opts); err != nil {
 		return nil, err
 	}
@@ -147,7 +159,7 @@ func build(opts Options) (*server, error) {
 	if err != nil || resource.Scheme == "" || resource.Host == "" {
 		return nil, fmt.Errorf("mcp: resource %q is not an absolute URI", opts.Resource)
 	}
-	s := &server{
+	s := &Server{
 		opts:        opts,
 		path:        resource.EscapedPath(),
 		origin:      resource.Scheme + "://" + resource.Host,
@@ -210,7 +222,7 @@ func privateCache(ttl time.Duration) func(context.Context, sdk.Request, *sdk.Cac
 // endpoint is the MCP handler: Origin check, bearer token, write scope,
 // rate limit, then the stateless transport, which answers 405 to GET and
 // DELETE.
-func (s *server) endpoint() http.Handler {
+func (s *Server) endpoint() http.Handler {
 	transport := sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return s.sdk }, &sdk.StreamableHTTPOptions{
 		Stateless:    true,
 		JSONResponse: true,
@@ -225,7 +237,7 @@ func (s *server) endpoint() http.Handler {
 }
 
 // metadata serves the RFC 9728 document for the resource.
-func (s *server) metadata() http.Handler {
+func (s *Server) metadata() http.Handler {
 	return auth.ProtectedResourceMetadataHandler(ProtectedResourceMetadata(s.opts.Resource, s.opts.Issuer, s.opts.Scopes.List()))
 }
 
