@@ -571,6 +571,43 @@ covered by `connect-src 'self'`; an API on another origin needs that origin in `
 The bundle only defaults to `https://proxy.scalar.com` in Scalar's own web client layout, not
 in the reference, so requests and their credentials do not pass through Scalar.
 
+## `bulle`
+
+A client for Bulle, called as the signed-in user, and the `/api/ideas` routes an app's own
+frontend uses. It needs only `net/http` and chi, and it does not import porte: the token comes
+from a `TokenSource func(ctx) (string, error)`, which is `porte/exchange`'s `Source.Token` in
+practice (audience `bulle`, scopes `bulle.read` and `bulle.write`).
+
+- `New(Config{URL, TokenSource, Forget, HTTPClient})`. `Forget` is optional and runs after a 401,
+  before the one retry. The default HTTP client has a 20 s timeout.
+- `Ideas(ctx, app, space)`, `Generate(ctx, app, space)`, `Run(ctx, ideaID, space)`,
+  `RunStatus(ctx, runID)`, `Decide(ctx, runID, callID, approve)`, `Dismiss(ctx, ideaID)`.
+  `space` is a Registre shared space id, or `""` for the personal space.
+- `Call(ctx, Request{Method, Segments, Query, Body}, out)` for any other route. Each segment is
+  escaped on its own; an empty, `.` or `..` segment is `ErrBadSegment` and sends nothing.
+- Errors: a 402 is `*PlanRequired{Message, UpgradeURL, Key}`, read from a bare body or from the
+  `{"error":{...}}` envelope (an unsafe `upgrade_url` is dropped). Any other 4xx is
+  `*StatusError{Status, Code, Message}`. A 5xx, a timeout or a network error wraps
+  `ErrUnreachable`.
+- `RunStatus` adds `State` (`running`, `needs_approval`, `done`, `failed`) and `ContinueURL`, clears
+  output URLs that are not http or https, and never carries Bulle's `decide_path`.
+
+`MountIdeas(router, Options{App, URL, TokenSource, Forget, HTTPClient, Space, AIAccess, UpgradeURL})`
+mounts, on the router the app's API lives on:
+
+| Route | Does |
+|---|---|
+| `GET /ideas` | `{ai_access, upgrade_url, ideas, generating, last_batch_at}`; no Bulle call without AI access |
+| `POST /ideas/generate` | starts a batch; 402 without AI access |
+| `POST /ideas/{id}/run` | starts a background run in the active space; 402 without AI access |
+| `POST /ideas/{id}/dismiss` | 204 |
+| `GET /ideas/runs/{run}` | the run |
+| `POST /ideas/runs/{run}/approvals/{call}` | `{"approve": bool}`, 204; approving needs AI access, declining does not |
+
+Mount it behind the app's authentication middleware. A Bulle 401 is about the app's token, so the
+frontend gets 503, never 401. A token source error that is a tronc `*errors.Error` (porte's
+`ErrReconnect` is a 412) is passed through as it is.
+
 ## `migrate`
 
 **A separate module.** `go get github.com/FacileStudio/tronc/migrate@v0.1.0` — the git tag is

@@ -137,6 +137,7 @@ healthcheck/  an argv hook so a distroless container can probe itself
 spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers
 apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
+bulle/        a client for Bulle's Ideas API, and MountIdeas for the app's own /api/ideas routes
 migrate/      SEPARATE MODULE — goose migrations and a `migrate` subcommand
 testdb/       SEPARATE MODULE — a real Postgres for tests, one schema per binary
 docs/         architecture, configuration, development, API reference
