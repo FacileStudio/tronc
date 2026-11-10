@@ -109,6 +109,15 @@ consumer cannot adopt the chassis without it. `spa` was extracted from Courrier'
 `internal/spa`, `httpx.Chain` exists because Mycelium does not use chi, and `LoadCoreWithout`
 exists because Mycelium has no database. Nothing here was designed speculatively.
 
-The hard constraint: **no new dependencies.** `github.com/go-chi/chi/v5` is the only one, and
-that is a feature of the module, not an accident. Anything that would need a second one belongs
-in the consumer.
+The hard constraint: **no new dependencies.** The root module allows exactly two:
+`github.com/go-chi/chi/v5` and `github.com/modelcontextprotocol/go-sdk` (with
+`github.com/google/jsonschema-go`, which the SDK already requires). Anything that would need a
+third belongs in the consumer.
+
+go-sdk joined on 2026-11-10 by owner decision. Every suite app now serves a remote MCP server,
+and the transport, auth challenge, Origin check, scope gate, pagination and confirmation flow
+were drifting the moment a second app copied them out of Courrier. `mcp/` holds that kit once.
+The cost is accepted: every tronc consumer pulls go-sdk and its small dependency set (oauth2,
+x/time, uritemplate, segmentio/encoding), including apps that do not mount `/mcp` yet. Pin
+go-sdk to one version here and bump it in tronc, not per app, so the whole suite speaks the
+same protocol version. tronc never imports porte: the token verifier is passed in.

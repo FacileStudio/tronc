@@ -6,6 +6,35 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **`mcp`, the remote MCP server kit, extracted from Courrier.** `mcp.Mount(router, Options)`
+  serves the go-sdk v1.8.0 streamable transport in stateless mode at the resource's path, with
+  the RFC 9728 metadata at its well-known path. In front of it: the Origin check (403), the
+  bearer check with `error="invalid_token"` and `resource_metadata` in the 401 challenge, a 403
+  `insufficient_scope` step-up challenge for a write tool called without the write scope, and a
+  per-person rate limit. GET answers 405. List results are cached privately.
+- **Typed tools with required annotations.** `mcp.NewTool(ToolSpec, handler)` builds a tool from a
+  typed go-sdk handler. `Mount` refuses a tool without the `<app>_` prefix, a title, a
+  description or all four hints, and any tool that is not read-only needs the write scope, at
+  the HTTP gate and again inside the handler. Write calls are audited, without arguments.
+- **`mcp.Confirmations`** asks a person before a sensitive action runs: MRTR `input_required`
+  when the client declares form elicitation on 2026-07-28, otherwise a pending action and a
+  confirm link. The question state is HMAC-signed and bound to the person, each action runs at
+  most once (atomic claim), and a target that changed since the question closes the action.
+  `mcp.PostgresPending` stores actions in `mcp_actions` (`mcp.PendingSchema`, additive).
+- **Helpers:** `Failure` for actionable tool errors, `Detailed`, `EncodeCursor`/`DecodeCursor`,
+  `FitCount`, `EncodedSize` and `Clip` for a 25k-token result budget.
+- **`mcp/mcptest`, the conformance kit.** `mcptest.Run` checks the 401 challenge, the metadata,
+  405 on GET, the Origin check, annotations, schemas, a stable sorted tool list, the write-scope
+  challenge and each sensitive tool's confirmation path. `NewIssuer` is a fake authorization
+  server and `NewPending` an in-memory store.
+
+### Changed
+
+- **The root module now requires `github.com/modelcontextprotocol/go-sdk` v1.8.0** beside chi
+  (owner decision; see `docs/development.md`).
+
 ## [0.18.0] - 2026-11-10
 
 ### Added
