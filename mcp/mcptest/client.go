@@ -3,6 +3,7 @@ package mcptest
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -98,8 +99,14 @@ func Answering(action string, asked *int) func(context.Context, *sdk.ElicitReque
 	}
 }
 
-// post sends one raw JSON-RPC body, closed with the test.
-func post(t testing.TB, endpoint, token, body string, header map[string]string) *http.Response {
+// reply is the status and headers of a raw request.
+type reply struct {
+	StatusCode int
+	Header     http.Header
+}
+
+// post sends one raw JSON-RPC body and returns its status and headers.
+func post(t testing.TB, endpoint, token, body string, header map[string]string) reply {
 	t.Helper()
 	req, _ := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -114,8 +121,9 @@ func post(t testing.TB, endpoint, token, body string, header map[string]string) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = resp.Body.Close() })
-	return resp
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	return reply{StatusCode: resp.StatusCode, Header: resp.Header}
 }
 
 // toolNames lists the names of tools in order.
