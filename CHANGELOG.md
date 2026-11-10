@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-10
+
 ### Added
 
 - **`mcp`, the remote MCP server kit, extracted from Courrier.** `mcp.Mount(router, Options)`
@@ -560,7 +562,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/FacileStudio/tronc/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/FacileStudio/tronc/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/FacileStudio/tronc/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/FacileStudio/tronc/compare/v0.16.0...v0.17.0
