@@ -6,6 +6,19 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-11
+
+### Security
+
+- build: Go 1.26.11 in the root, `migrate` and `testdb` modules (`go` directives, CI and mise
+  pins). It fixes GO-2026-6848 to GO-2026-6859 in the standard library and toolchain, which
+  douane reported as unscored gaps and which failed the gate.
+- build(deps): `golang.org/x/sys` v0.41.0 to v0.44.0 (GO-2026-5024). In `testdb`:
+  `jackc/pgx/v5` v5.6.0 to v5.9.2 (CVE-2026-33815, CVE-2026-33816, both critical) and
+  `golang.org/x/text` v0.21.0 to v0.41.0 (GO-2026-5970, GO-2026-6629); `golang.org/x/crypto`
+  leaves `testdb` because pgx v5.9.2 no longer needs it.
+- Tags `migrate/v0.1.1` and `testdb/v0.1.2` carry the same change for the nested modules.
+
 ## [0.22.0] - 2026-11-11
 
 ### Added
