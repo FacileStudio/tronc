@@ -8,6 +8,29 @@ while on `v0`, a breaking change bumps the minor.
 
 ### Added
 
+- **`mcp.PendingPage[T]`, the confirm page API.** `Routes` serves `GET /`, `POST /{id}/confirm`
+  and `POST /{id}/dismiss`, the handlers Courrier, Agenda, Nuage, Opus and Sablier each wrote in
+  `modules/mcp/pending_routes.go`. The app passes how to read the signed-in person (`User`, which
+  refuses a delegated token with the new `ErrDelegated`), the detail of each target
+  (`Describe`, over the shared `PendingItem` its item type embeds) and the confirm result
+  (`Done`). `PendingList[T]`, `PendingResult` and `EmptyRequest` replace the five copies of
+  `types_pending.go`; `PendingRoutes[T](PendingDoc)` replaces the five `documentation.go`
+  route lists.
+- **`mcp.NewApp(AppConfig, AppSpec)`**, the wiring every app's `NewService` repeated: resource
+  check, confirmations with the confirm page at `<origin>/pending`, and the server at
+  `PerMinute` calls a minute (default 120). `AppConfig` is the five apps' identical `Config`.
+- **`mcp.Digest` and `mcp.TargetIDs`.** The fingerprint all five apps computed (hex of the first
+  16 bytes of SHA-256 over NUL-joined fields), byte for byte, so actions opened before an app
+  adopts it still confirm; and the user-plus-numeric-target parse Agenda, Opus and Sablier
+  shared.
+- **Erasing pending actions.** `Pending.Erase(ctx, userIDs...)`, implemented by
+  `PostgresPending` and `mcptest.Pending`, and `ErasePending(ctx, exec, userIDs...)` to run the
+  same delete inside an account erasure's own transaction. Courrier, Nuage, Opus and Sablier
+  each kept their own `DELETE FROM mcp_actions` for this.
+- **apiref reflects embedded structs and generic types.** The fields of a struct embedded by
+  value are promoted into the outer schema, as encoding/json promotes them, instead of being
+  dropped (unexported type) or nested under the type name. An instance of a generic type gets a
+  valid component name, `PendingList_Item`, instead of one holding brackets and package paths.
 - **Conformance vectors.** `conformance/vectors/*.json` pins what `errors`, `httpjson`, `health`,
   the request log, the security headers, the client-IP rule, `spa` and `spa.InlineScriptHashes`
   answer today, in a JSON envelope (`source`, `subject`, `cases`) a port reads as its
@@ -17,6 +40,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ### Changed
 
+- **Breaking for custom stores:** `mcp.Pending` gains `Erase`. Every suite app uses
+  `PostgresPending` or `mcptest.Pending`, which both implement it.
 - Licence: tronc is now licensed under `MIT` (see `LICENSE`); before this, the repository carried no licence. The nested `migrate` and `testdb` modules carry the same file.
 
 ## [0.21.0] - 2026-11-10

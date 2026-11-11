@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -278,5 +279,39 @@ func TestIncompleteFindsThinOrMissingRouteDeclarations(t *testing.T) {
 	issues := apiref.Incomplete(cfg)
 	if len(issues) < 2 {
 		t.Fatalf("Incomplete() = %v, want at least 2 issues", issues)
+	}
+}
+
+type baseItem struct {
+	ID    string `json:"id"`
+	State string `json:"state"`
+}
+
+type appItem struct {
+	baseItem
+	State string `json:"state,omitempty"`
+	Extra *int   `json:"extra,omitempty"`
+}
+
+type page[T any] struct {
+	Items []T `json:"items"`
+}
+
+func TestOpenAPIPromotesEmbeddedFieldsAndNamesGenericTypes(t *testing.T) {
+	cfg := apiref.Config{Registry: apiref.Registry{Modules: []apiref.Module{{
+		Name:   "items",
+		Routes: []apiref.Route{{Method: "GET", Path: "/items", Summary: "List", ResponseBody: page[appItem]{}}},
+	}}}}
+	schemas := apiref.OpenAPI(cfg)["components"].(map[string]any)["schemas"].(map[string]any)
+	if _, ok := schemas["page_appItem"]; !ok {
+		t.Fatalf("want the generic page named page_appItem, got %v", schemas)
+	}
+	item := schemas["appItem"].(map[string]any)
+	props := item["properties"].(map[string]any)
+	if props["id"] == nil || props["extra"] == nil || props["baseItem"] != nil {
+		t.Fatalf("want id promoted from the embedded struct, got %v", props)
+	}
+	if required := item["required"].([]string); !slices.Equal(required, []string{"id"}) {
+		t.Fatalf("want only the promoted id required, the outer state winning as optional, got %v", required)
 	}
 }
