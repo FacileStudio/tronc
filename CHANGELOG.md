@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-11
+
 ### Added
 
 - **`mcp.PendingPage[T]`, the confirm page API.** `Routes` serves `GET /`, `POST /{id}/confirm`
@@ -639,7 +641,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/FacileStudio/tronc/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/FacileStudio/tronc/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/FacileStudio/tronc/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/FacileStudio/tronc/compare/v0.18.0...v0.19.0
