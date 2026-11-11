@@ -6,6 +6,14 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-11-11
+
+### Security
+
+- build(deps): `github.com/go-chi/chi/v5` v5.2.3 to v5.5.0 in the root module (CVE-2026-72815,
+  CVE-2026-72816, CVE-2026-72817, CVE-2025-69725, CVE-2026-114437). No API change; `migrate` and
+  `testdb` are untouched and keep `migrate/v0.1.1` and `testdb/v0.1.2`.
+
 ## [0.22.1] - 2026-11-11
 
 ### Security
