@@ -41,3 +41,23 @@ func TestPendingClaimsOnce(t *testing.T) {
 		t.Fatalf("a released action is open again, got %d", len(open))
 	}
 }
+
+// TestPendingErasesOnlyThePeopleNamed checks an erasure removes every
+// action of the people named and keeps everyone else's.
+func TestPendingErasesOnlyThePeopleNamed(t *testing.T) {
+	store := NewPending()
+	for _, a := range []mcp.Action{{ID: "a1", UserID: "u1"}, {ID: "a2", UserID: "u2"}, {ID: "a3", UserID: "u3"}} {
+		a.ExpiresAt = time.Now().Add(time.Hour)
+		if err := store.Create(t.Context(), a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Erase(t.Context(), "u1", "u2"); err != nil {
+		t.Fatal(err)
+	}
+	for user, want := range map[string]int{"u1": 0, "u2": 0, "u3": 1} {
+		if open, _ := store.Open(t.Context(), user); len(open) != want {
+			t.Fatalf("want %d actions left for %s, got %d", want, user, len(open))
+		}
+	}
+}

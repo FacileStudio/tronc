@@ -642,6 +642,14 @@ func CallerOf(req *sdk.CallToolRequest) (Caller, error)
 func Failure(err error, hint string) error
 func Audit(ctx context.Context, logger *slog.Logger, e Event)
 
+func NewApp(cfg AppConfig, spec AppSpec) (*App, error)
+func (p *PendingPage[T]) Routes(r chi.Router)
+func (p *PendingPage[T]) List(ctx, userID string) (PendingList[T], error)
+func PendingRoutes[T any](doc PendingDoc) []apiref.Route
+func Digest(fields ...string) string
+func TargetIDs(a Action, refusal error) (userID, targetID int64, err error)
+func ErasePending(ctx, exec Execer, userIDs ...string) error
+
 func NewConfirmations(cfg ConfirmConfig) (*Confirmations, error)
 func (c *Confirmations) Request(ctx, req, kind, target, question string) (*sdk.CallToolResult, Outcome, error)
 func (c *Confirmations) Resume(ctx, req, kind string) (Outcome, error)
@@ -684,24 +692,38 @@ rate limit.
   did not see. The app's confirm page lists `Open`, shows `State`, and calls `Confirm` or
   `Dismiss`; it must refuse a delegated token, because an agent never confirms its own request.
 - **Storage.** `PostgresPending{DB}` over `mcp_actions`; run `PendingSchema` with the app's
-  migrations.
+  migrations. An account erasure deletes the person's actions with `Pending.Erase`, or with
+  `ErasePending(ctx, tx, ids...)` inside its own transaction (`tx.Statement.ConnPool` on GORM).
+- **App glue.** `NewApp(AppConfig, AppSpec)` is the whole of an app's `NewService` wiring: it
+  checks the resource, builds the confirmations with the confirm page at the origin's
+  `/pending`, and the server with `PerMinute` calls a minute (default 120, burst as many).
+  `AppConfig` is what `main` fills; `AppSpec` is what the module declares. Tools and kinds may
+  close over a toolset whose `confirm` field is set from `App.Confirmations` afterwards.
+- **Confirm page.** `PendingPage[T]` serves `GET /`, `POST /{id}/confirm` and
+  `POST /{id}/dismiss`; mount `Routes` at `/mcp/pending` behind the app's auth. `User` returns
+  the signed-in id and must refuse anything but the person's own session (`ErrDelegated`).
+  `Describe` adds the target to the shared `PendingItem`, which the app's item type embeds.
+  `Done` picks the confirm result (nil answers `done`). `PendingRoutes[T](PendingDoc)` documents
+  the three routes for apiref; the list schema is named `PendingList_<Item>`.
+- **Targets.** `Digest(fields...)` is the fingerprint every app used (hex of the first 16 bytes
+  of SHA-256 over NUL-joined fields), so open actions survive the move. `TargetIDs` reads an
+  action whose user id and target are both decimal ids.
 
 ```go
-confirm, err := mcp.NewConfirmations(mcp.ConfirmConfig{
-	Store:      mcp.PostgresPending{DB: sqlDB},
-	Key:        stateKey,
-	ConfirmURL: "https://agenda.facile.studio/pending",
-	Kinds:      map[string]mcp.Kind{"delete_event": {Tool: "agenda_delete_event", Fingerprint: digest, Run: remove}},
-})
 verifier, err := mcpauth.Verifier(ctx, mcpauth.Config{Issuer: issuer, Resource: resource, ScopePrefix: "agenda", Identities: identities})
-err = mcp.Mount(router, mcp.Options{
-	Name: "agenda", Title: "Agenda", Version: version, Instructions: instructions,
-	Resource: resource, Issuer: issuer, Verifier: verifier, Audit: logger,
-	Tools: []mcp.Tool{
-		mcp.NewTool(mcp.ToolSpec{Name: "agenda_list_calendars", Title: "List calendars",
-			Description: "...", Annotations: &mcp.Annotations{ReadOnly: true, Idempotent: true}}, listCalendars),
-	},
+tools := &toolset{events: events}
+app, err := mcp.NewApp(mcp.AppConfig{
+	Resource: resource, Issuer: issuer, Version: version, StateKey: stateKey,
+	Verifier: verifier, Pending: mcp.PostgresPending{DB: sqlDB}, Logger: logger,
+}, mcp.AppSpec{
+	Name: "agenda", Title: "Agenda", Instructions: instructions,
+	Kinds: map[string]mcp.Kind{"delete_event": {Tool: "agenda_delete_event", Fingerprint: tools.fingerprint, Run: tools.remove}},
+	Tools: tools.list(),
 })
+tools.confirm = app.Confirmations
+app.Server.Mount(rootRouter)
+page := &mcp.PendingPage[PendingItem]{Confirmations: app.Confirmations, Actor: "agenda-web", User: pageUser, Describe: tools.describe}
+apiRouter.Route("/mcp/pending", func(r chi.Router) { r.Use(requireAuth); page.Routes(r) })
 ```
 
 ### `mcp/mcptest`

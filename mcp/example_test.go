@@ -127,28 +127,56 @@ func (n *notes) tools() []mcp.Tool {
 	}
 }
 
-// serve mounts the toy app and returns its resource URL.
+// noteItem is a confirm page entry of the toy app.
+type noteItem struct {
+	mcp.PendingItem
+	Text string `json:"text,omitempty"`
+}
+
+// delegated is the header the toy app's sessions use to mark an agent.
+const delegated = "X-Delegated"
+
+// pageUser is the toy app's signed-in person: the X-User header, refused
+// when X-Delegated is set.
+func pageUser(r *http.Request) (string, error) {
+	if r.Header.Get(delegated) != "" {
+		return "", mcp.ErrDelegated
+	}
+	return r.Header.Get("X-User"), nil
+}
+
+// serve mounts the toy app, its MCP server and its confirm page, and
+// returns its resource URL.
 func serve(t *testing.T) (*notes, string) {
 	t.Helper()
 	n := &notes{text: map[string]string{}, deleted: map[string]int{}}
 	router := chi.NewRouter()
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
-	confirm, err := mcp.NewConfirmations(mcp.ConfirmConfig{
-		Store: mcptest.NewPending(), Key: []byte("key"), ConfirmURL: srv.URL + "/pending",
+	app, err := mcp.NewApp(mcp.AppConfig{
+		Resource: srv.URL + "/mcp", Issuer: "https://issuer.example", Version: "test", StateKey: []byte("key"),
+		Verifier: verify, Pending: mcptest.NewPending(),
+	}, mcp.AppSpec{
+		Name: "notes", Title: "Notes", Tools: n.tools(),
 		Kinds: map[string]mcp.Kind{"delete": {Tool: "notes_delete", Fingerprint: n.fingerprint, Run: n.remove}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	n.confirm = confirm
-	err = mcp.Mount(router, mcp.Options{
-		Name: "notes", Title: "Notes", Version: "test", Resource: srv.URL + "/mcp", Issuer: "https://issuer.example",
-		Verifier: verify, Tools: n.tools(),
-	})
-	if err != nil {
-		t.Fatal(err)
+	n.confirm = app.Confirmations
+	app.Server.Mount(router)
+	page := &mcp.PendingPage[noteItem]{
+		Confirmations: app.Confirmations, Actor: "notes-web", User: pageUser,
+		Describe: func(_ context.Context, item mcp.PendingItem, a mcp.Action) noteItem {
+			n.mu.Lock()
+			defer n.mu.Unlock()
+			return noteItem{PendingItem: item, Text: n.text[a.Target]}
+		},
+		Done: func(_ context.Context, o mcp.Outcome) mcp.PendingResult {
+			return mcp.PendingResult{Status: "deleted", URL: o.Action.Target}
+		},
 	}
+	router.Route("/api/mcp/pending", page.Routes)
 	return n, srv.URL + "/mcp"
 }
 
