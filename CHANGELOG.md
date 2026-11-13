@@ -6,7 +6,7 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
-## [0.23.0] - Unreleased
+## [0.23.0] - 2026-11-13
 
 Rust: ported in tronc-rs v0.5.0; TS: ported in tronc-ts v0.3.0. Each entry names the port's
 counterpart.
