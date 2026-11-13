@@ -13,9 +13,14 @@ const MessageDeclined = "The user declined. Nothing happened."
 // on the confirm page: nothing ran, hand over confirm_url, and do not ask
 // again.
 func (c *Confirmations) Waiting() string {
+	return waiting(c.cfg.PendingTTL)
+}
+
+// waiting is the Waiting text for an action that stays open for ttl.
+func waiting(ttl time.Duration) string {
 	return "Nothing happened yet: your client cannot ask the user to confirm. Give the user confirm_url and " +
 		"ask them to confirm there. Do not call this tool again for the same target; the request stays open for " +
-		lifetime(c.cfg.PendingTTL) + "."
+		lifetime(ttl) + "."
 }
 
 // lifetime names ttl in whole days, or in hours below a day.

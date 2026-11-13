@@ -133,13 +133,17 @@ type mcpRateWant struct {
 	RetryAfter  bool           `json:"retry_after"`
 }
 
+// mcpRateLimitVectors pins the per-user bucket against the real clock, so
+// every case must hold however slowly a port replays it. The default case
+// only spends the burst, which a refill can never refuse; the refusals come
+// from the small limits, whose next token is 20 seconds or more away.
 func mcpRateLimitVectors(t *testing.T) []vector {
 	t.Helper()
 	inputs := []struct {
 		name  string
 		input mcpRateInput
 	}{
-		{"default_is_120_a_minute_with_a_burst_of_120", mcpRateInput{PerMinute: 0, Users: []string{"u1"}, Requests: mcp.DefaultPerMinute + 1}},
+		{"default_burst_admits_120_at_once", mcpRateInput{PerMinute: 0, Users: []string{"u1"}, Requests: mcp.DefaultPerMinute}},
 		{"burst_is_per_minute", mcpRateInput{PerMinute: 3, Users: []string{"u1"}, Requests: 5}},
 		{"one_bucket_per_user", mcpRateInput{PerMinute: 2, Users: []string{"u1", "u2"}, Requests: 3}},
 	}

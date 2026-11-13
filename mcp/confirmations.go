@@ -139,10 +139,13 @@ func NewConfirmations(cfg ConfirmConfig) (*Confirmations, error) {
 // Request opens a pending action of kind on target and asks the person
 // question. When the person already has an open action of that kind on
 // that target, with the same digest, it asks about that one instead of
-// opening another, so an agent that loops on a tool opens one action. When
-// the client can elicit, it returns the input_required result for the tool
+// opening another, so an agent that loops on a tool opens one action. The
+// reuse is best effort: two concurrent identical requests can still open two.
+// A reused action keeps its first client, which the audit of its run names,
+// and its first expiry, which the Waiting text counts down from. When the
+// client can elicit, it returns the input_required result for the tool
 // to return as is. Otherwise the result is nil and the Outcome holds
-// StatusPending, the confirm link and Waiting(). Either way nothing has run
+// StatusPending, the confirm link and the Waiting text. Either way nothing has run
 // yet.
 func (c *Confirmations) Request(ctx context.Context, req *sdk.CallToolRequest, kind, target, question string) (*sdk.CallToolResult, Outcome, error) {
 	who, err := CallerOf(req)
@@ -164,7 +167,7 @@ func (c *Confirmations) Request(ctx context.Context, req *sdk.CallToolRequest, k
 	if CanElicit(req) {
 		return c.signer.ask(who.UserID, action.ID, question), Outcome{Status: StatusPending, Action: action}, nil
 	}
-	return nil, Outcome{Status: StatusPending, Action: action, ConfirmURL: c.Link(action.ID), Message: c.Waiting()}, nil
+	return nil, Outcome{Status: StatusPending, Action: action, ConfirmURL: c.Link(action.ID), Message: waiting(time.Until(action.ExpiresAt).Round(time.Hour))}, nil
 }
 
 // Resume handles the retry that carries the person's answer to a question

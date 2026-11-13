@@ -10,6 +10,8 @@ import (
 
 	"github.com/FacileStudio/tronc/mcp"
 	"github.com/FacileStudio/tronc/mcp/mcptest"
+	"github.com/modelcontextprotocol/go-sdk/auth"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // TestRequestReusesTheOpenAction checks a second ask about the same note,
@@ -31,6 +33,42 @@ func TestRequestReusesTheOpenAction(t *testing.T) {
 	mcptest.Decode(t, mcptest.Call(t, session, "notes_delete", map[string]any{"id": "a"}), &out)
 	if !strings.HasPrefix(out.Message, "Nothing happened yet") || !strings.HasSuffix(out.Message, "7 days.") {
 		t.Fatalf("want the standard waiting text, got %q", out.Message)
+	}
+}
+
+// TestReusedActionKeepsItsFirstClientAndExpiry checks a request that reuses
+// an open action names the time that action has left, not a fresh lifetime,
+// and keeps the client that first asked.
+func TestReusedActionKeepsItsFirstClientAndExpiry(t *testing.T) {
+	store := mcptest.NewPending()
+	now := time.Now()
+	if err := store.Create(t.Context(), mcp.Action{
+		ID: "old", UserID: "u1", Kind: "delete", Target: "a", Digest: "d", ClientID: "client-a",
+		CreatedAt: now.Add(-5 * 24 * time.Hour), ExpiresAt: now.Add(2*24*time.Hour + time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	confirm, err := mcp.NewConfirmations(mcp.ConfirmConfig{
+		Store: store, Key: mcp.StateKey("notes", "secret"), ConfirmURL: "https://notes.example/pending",
+		Kinds: map[string]mcp.Kind{"delete": {
+			Tool:        "notes_delete",
+			Fingerprint: func(context.Context, mcp.Action) (string, error) { return "d", nil },
+			Run:         func(context.Context, mcp.Action) error { return nil },
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &sdk.CallToolRequest{
+		Params: &sdk.CallToolParamsRaw{},
+		Extra:  &sdk.RequestExtra{TokenInfo: &auth.TokenInfo{UserID: "u1", Extra: map[string]any{mcp.ExtraClientID: "client-b"}}},
+	}
+	_, out, err := confirm.Request(t.Context(), req, "delete", "a", "Delete a?")
+	if err != nil || out.Action.ID != "old" || out.Action.ClientID != "client-a" {
+		t.Fatalf("want the open action of client-a reused, got %+v %v", out.Action, err)
+	}
+	if !strings.HasSuffix(out.Message, "stays open for 2 days.") {
+		t.Fatalf("want the time the reused action has left, got %q", out.Message)
 	}
 }
 
