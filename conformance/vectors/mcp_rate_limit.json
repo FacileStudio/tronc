@@ -1,0 +1,65 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "mcp_rate_limit",
+  "cases": [
+    {
+      "name": "default_burst_admits_120_at_once",
+      "input": {
+        "per_minute": 0,
+        "users": [
+          "u1"
+        ],
+        "requests_each": 120
+      },
+      "want": {
+        "allowed": {
+          "u1": 120
+        },
+        "refused_status": 0,
+        "refused_content_type": "",
+        "refused_body": "",
+        "retry_after": false
+      }
+    },
+    {
+      "name": "burst_is_per_minute",
+      "input": {
+        "per_minute": 3,
+        "users": [
+          "u1"
+        ],
+        "requests_each": 5
+      },
+      "want": {
+        "allowed": {
+          "u1": 3
+        },
+        "refused_status": 429,
+        "refused_content_type": "text/plain; charset=utf-8",
+        "refused_body": "rate limit exceeded",
+        "retry_after": true
+      }
+    },
+    {
+      "name": "one_bucket_per_user",
+      "input": {
+        "per_minute": 2,
+        "users": [
+          "u1",
+          "u2"
+        ],
+        "requests_each": 3
+      },
+      "want": {
+        "allowed": {
+          "u1": 2,
+          "u2": 2
+        },
+        "refused_status": 429,
+        "refused_content_type": "text/plain; charset=utf-8",
+        "refused_body": "rate limit exceeded",
+        "retry_after": true
+      }
+    }
+  ]
+}

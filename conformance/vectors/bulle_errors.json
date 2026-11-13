@@ -1,0 +1,225 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "bulle_errors",
+  "cases": [
+    {
+      "name": "ok",
+      "input": {
+        "status": 200,
+        "body": "{\"text\":\"hi\",\"model\":\"m\"}"
+      },
+      "want": {
+        "kind": "ok"
+      }
+    },
+    {
+      "name": "payment_required_envelope",
+      "input": {
+        "status": 402,
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"No AI\",\"upgrade_url\":\"https://sso.example/spaces\",\"key\":\"ai.access\"}}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "No AI",
+        "upgrade_url": "https://sso.example/spaces",
+        "key": "ai.access"
+      }
+    },
+    {
+      "name": "payment_required_bare",
+      "input": {
+        "status": 402,
+        "body": "{\"code\":\"payment_required\",\"message\":\"No AI\",\"upgrade_url\":\"/billing\",\"key\":\"ai.access\"}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "No AI",
+        "upgrade_url": "/billing",
+        "key": "ai.access"
+      }
+    },
+    {
+      "name": "payment_required_with_limit",
+      "input": {
+        "status": 402,
+        "body": "{\"error\":{\"code\":\"payment_required\",\"message\":\"Plan limit\",\"key\":\"rooms\",\"limit\":3}}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "Plan limit",
+        "key": "rooms",
+        "limit": 3
+      }
+    },
+    {
+      "name": "payment_required_string_error",
+      "input": {
+        "status": 402,
+        "body": "{\"error\":\"No AI\"}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "No AI"
+      }
+    },
+    {
+      "name": "payment_required_javascript_dropped",
+      "input": {
+        "status": 402,
+        "body": "{\"error\":{\"message\":\"No AI\",\"upgrade_url\":\"javascript:alert(1)\"}}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "No AI"
+      }
+    },
+    {
+      "name": "payment_required_http_dropped",
+      "input": {
+        "status": 402,
+        "body": "{\"error\":{\"message\":\"No AI\",\"upgrade_url\":\"http://sso.example/spaces\"}}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "No AI"
+      }
+    },
+    {
+      "name": "payment_required_protocol_relative_dropped",
+      "input": {
+        "status": 402,
+        "body": "{\"error\":{\"message\":\"No AI\",\"upgrade_url\":\"//evil.example\"}}"
+      },
+      "want": {
+        "kind": "plan_required",
+        "message": "No AI"
+      }
+    },
+    {
+      "name": "payment_required_unreadable_body",
+      "input": {
+        "status": 402,
+        "body": "<html>"
+      },
+      "want": {
+        "kind": "plan_required"
+      }
+    },
+    {
+      "name": "bad_request",
+      "input": {
+        "status": 400,
+        "body": "{\"error\":{\"code\":\"invalid_argument\",\"message\":\"prompt is required\"}}"
+      },
+      "want": {
+        "kind": "status",
+        "status": 400,
+        "code": "invalid_argument",
+        "message": "prompt is required"
+      }
+    },
+    {
+      "name": "unauthorized",
+      "input": {
+        "status": 401,
+        "body": "{\"error\":{\"code\":\"unauthenticated\",\"message\":\"missing auth\"}}"
+      },
+      "want": {
+        "kind": "status",
+        "status": 401,
+        "code": "unauthenticated",
+        "message": "missing auth"
+      }
+    },
+    {
+      "name": "forbidden",
+      "input": {
+        "status": 403,
+        "body": "{\"error\":{\"code\":\"permission_denied\",\"message\":\"an exchanged token is required\"}}"
+      },
+      "want": {
+        "kind": "status",
+        "status": 403,
+        "code": "permission_denied",
+        "message": "an exchanged token is required"
+      }
+    },
+    {
+      "name": "conflict",
+      "input": {
+        "status": 409,
+        "body": "{\"error\":{\"code\":\"already_exists\",\"message\":\"a batch is running\"}}"
+      },
+      "want": {
+        "kind": "status",
+        "status": 409,
+        "code": "already_exists",
+        "message": "a batch is running"
+      }
+    },
+    {
+      "name": "daily_cap",
+      "input": {
+        "status": 429,
+        "body": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"at most 200 completions per day\"}}"
+      },
+      "want": {
+        "kind": "status",
+        "status": 429,
+        "code": "rate_limited",
+        "message": "at most 200 completions per day"
+      }
+    },
+    {
+      "name": "plain_text_429",
+      "input": {
+        "status": 429,
+        "body": "Too Many Requests"
+      },
+      "want": {
+        "kind": "status",
+        "status": 429
+      }
+    },
+    {
+      "name": "server_error_unreachable",
+      "input": {
+        "status": 500,
+        "body": "{\"error\":{\"code\":\"internal\",\"message\":\"boom\"}}"
+      },
+      "want": {
+        "kind": "unreachable"
+      }
+    },
+    {
+      "name": "unavailable_unreachable",
+      "input": {
+        "status": 503,
+        "body": "{\"error\":{\"code\":\"unavailable\",\"message\":\"the model did not answer\"}}"
+      },
+      "want": {
+        "kind": "unreachable"
+      }
+    },
+    {
+      "name": "redirect_refused",
+      "input": {
+        "status": 307,
+        "location": "https://elsewhere.example/api/ai/complete"
+      },
+      "want": {
+        "kind": "unreachable"
+      }
+    },
+    {
+      "name": "ok_unreadable_body",
+      "input": {
+        "status": 200,
+        "body": "not json"
+      },
+      "want": {
+        "kind": "unreachable"
+      }
+    }
+  ]
+}

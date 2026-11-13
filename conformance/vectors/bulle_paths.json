@@ -1,0 +1,133 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "bulle_paths",
+  "cases": [
+    {
+      "name": "plain",
+      "input": {
+        "segments": [
+          "ideas",
+          "i1",
+          "run"
+        ]
+      },
+      "want": {
+        "path": "/api/ideas/i1/run"
+      }
+    },
+    {
+      "name": "slash_stays_in_segment",
+      "input": {
+        "segments": [
+          "ideas",
+          "a/b",
+          "run"
+        ]
+      },
+      "want": {
+        "path": "/api/ideas/a%2Fb/run"
+      }
+    },
+    {
+      "name": "dot_dot_inside_segment",
+      "input": {
+        "segments": [
+          "ideas",
+          "a/../b?x=1",
+          "run"
+        ]
+      },
+      "want": {
+        "path": "/api/ideas/a%2F..%2Fb%3Fx=1/run"
+      }
+    },
+    {
+      "name": "space_and_unicode",
+      "input": {
+        "segments": [
+          "runs",
+          "r 1é"
+        ]
+      },
+      "want": {
+        "path": "/api/runs/r%201%C3%A9"
+      }
+    },
+    {
+      "name": "percent",
+      "input": {
+        "segments": [
+          "runs",
+          "50%"
+        ]
+      },
+      "want": {
+        "path": "/api/runs/50%25"
+      }
+    },
+    {
+      "name": "query_encoded",
+      "input": {
+        "segments": [
+          "ideas"
+        ],
+        "query": {
+          "app": "agenda",
+          "space_id": "space 1&x"
+        }
+      },
+      "want": {
+        "path": "/api/ideas",
+        "query": "app=agenda&space_id=space+1%26x"
+      }
+    },
+    {
+      "name": "empty_segment_refused",
+      "input": {
+        "segments": [
+          "ideas",
+          ""
+        ]
+      },
+      "want": {
+        "error": "bad_segment"
+      }
+    },
+    {
+      "name": "dot_segment_refused",
+      "input": {
+        "segments": [
+          "ideas",
+          "."
+        ]
+      },
+      "want": {
+        "error": "bad_segment"
+      }
+    },
+    {
+      "name": "dot_dot_segment_refused",
+      "input": {
+        "segments": [
+          "..",
+          "admin"
+        ]
+      },
+      "want": {
+        "error": "bad_segment"
+      }
+    },
+    {
+      "name": "long_segment_refused",
+      "input": {
+        "segments": [
+          "ideas",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ]
+      },
+      "want": {
+        "error": "bad_segment"
+      }
+    }
+  ]
+}

@@ -18,7 +18,10 @@ import (
 	"testing"
 )
 
-const source = "github.com/FacileStudio/tronc@871cd90"
+const (
+	source  = "github.com/FacileStudio/tronc@871cd90"
+	release = "github.com/FacileStudio/tronc@v0.23.0"
+)
 
 var update = flag.Bool("update", false, "rewrite conformance/vectors from the code")
 
@@ -43,6 +46,25 @@ var subjects = map[string]func(*testing.T) []vector{
 	"client_ip":            clientIPVectors,
 	"spa":                  spaVectors,
 	"inline_script_hashes": inlineScriptHashVectors,
+	"mcp_http":             mcpHTTPVectors,
+	"mcp_rate_limit":       mcpRateLimitVectors,
+	"mcp_digest":           mcpDigestVectors,
+	"mcp_state_key":        mcpStateKeyVectors,
+	"mcp_failure":          mcpFailureVectors,
+	"bulle_errors":         bulleErrorVectors,
+	"bulle_paths":          bullePathVectors,
+}
+
+// sources names the release that added a subject; the others keep the
+// commit they were first cut from, so their files stay byte-identical.
+var sources = map[string]string{
+	"mcp_http":       release,
+	"mcp_rate_limit": release,
+	"mcp_digest":     release,
+	"mcp_state_key":  release,
+	"mcp_failure":    release,
+	"bulle_errors":   release,
+	"bulle_paths":    release,
 }
 
 func TestVectors(t *testing.T) {
@@ -68,7 +90,11 @@ func TestNoStrayVectors(t *testing.T) {
 
 func compare(t *testing.T, subject string, cases []vector) {
 	t.Helper()
-	got := encode(t, vectorFile{Source: source, Subject: subject, Cases: cases})
+	from := source
+	if tag, ok := sources[subject]; ok {
+		from = tag
+	}
+	got := encode(t, vectorFile{Source: from, Subject: subject, Cases: cases})
 	path := filepath.Join("vectors", subject+".json")
 	if *update {
 		if err := os.WriteFile(path, got, 0o644); err != nil {

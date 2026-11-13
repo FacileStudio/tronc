@@ -1,0 +1,189 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "mcp_http",
+  "cases": [
+    {
+      "name": "no_token_401",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_list\",\"arguments\":{}}}"
+      },
+      "want": {
+        "status": 401,
+        "content_type": "text/plain; charset=utf-8",
+        "www_authenticate": "Bearer resource_metadata=\"https://notes.example/.well-known/oauth-protected-resource/mcp\", scope=\"notes.read\"",
+        "body": "no bearer token\n"
+      }
+    },
+    {
+      "name": "invalid_token_401",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer garbage"
+        },
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_list\",\"arguments\":{}}}"
+      },
+      "want": {
+        "status": 401,
+        "content_type": "text/plain; charset=utf-8",
+        "www_authenticate": "Bearer error=\"invalid_token\", resource_metadata=\"https://notes.example/.well-known/oauth-protected-resource/mcp\", scope=\"notes.read\"",
+        "body": "invalid token\n"
+      }
+    },
+    {
+      "name": "missing_read_scope_403",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|other.read"
+        },
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_list\",\"arguments\":{}}}"
+      },
+      "want": {
+        "status": 403,
+        "content_type": "text/plain; charset=utf-8",
+        "www_authenticate": "Bearer error=\"insufficient_scope\", resource_metadata=\"https://notes.example/.well-known/oauth-protected-resource/mcp\", scope=\"notes.read\"",
+        "body": "insufficient scope\n"
+      }
+    },
+    {
+      "name": "write_tool_with_read_scope_403",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|notes.read"
+        },
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_write\",\"arguments\":{}}}"
+      },
+      "want": {
+        "status": 403,
+        "content_type": "text/plain; charset=utf-8",
+        "www_authenticate": "Bearer error=\"insufficient_scope\", scope=\"notes.write\", resource_metadata=\"https://notes.example/.well-known/oauth-protected-resource/mcp\"",
+        "body": "Forbidden: this tool needs the notes.write scope\n"
+      }
+    },
+    {
+      "name": "write_tool_in_batch_403",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|notes.read"
+        },
+        "body": "[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"},{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_write\",\"arguments\":{}}}]"
+      },
+      "want": {
+        "status": 403,
+        "content_type": "text/plain; charset=utf-8",
+        "www_authenticate": "Bearer error=\"insufficient_scope\", scope=\"notes.write\", resource_metadata=\"https://notes.example/.well-known/oauth-protected-resource/mcp\"",
+        "body": "Forbidden: this tool needs the notes.write scope\n"
+      }
+    },
+    {
+      "name": "foreign_origin_403",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|notes.read",
+          "Origin": "https://evil.example"
+        },
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_list\",\"arguments\":{}}}"
+      },
+      "want": {
+        "status": 403,
+        "content_type": "text/plain; charset=utf-8",
+        "body": "Forbidden: origin not allowed\n"
+      }
+    },
+    {
+      "name": "foreign_origin_before_token",
+      "input": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "Origin": "https://evil.example"
+        },
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notes_list\",\"arguments\":{}}}"
+      },
+      "want": {
+        "status": 403,
+        "content_type": "text/plain; charset=utf-8",
+        "body": "Forbidden: origin not allowed\n"
+      }
+    },
+    {
+      "name": "get_405",
+      "input": {
+        "method": "GET",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|notes.read"
+        }
+      },
+      "want": {
+        "status": 405,
+        "content_type": "text/plain; charset=utf-8"
+      }
+    },
+    {
+      "name": "own_origin_get_405",
+      "input": {
+        "method": "GET",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|notes.read",
+          "Origin": "https://notes.example"
+        }
+      },
+      "want": {
+        "status": 405,
+        "content_type": "text/plain; charset=utf-8"
+      }
+    },
+    {
+      "name": "extra_origin_get_405",
+      "input": {
+        "method": "GET",
+        "path": "/mcp",
+        "headers": {
+          "Authorization": "Bearer u1|notes.read",
+          "Origin": "https://app.notes.example"
+        }
+      },
+      "want": {
+        "status": 405,
+        "content_type": "text/plain; charset=utf-8"
+      }
+    },
+    {
+      "name": "metadata_at_resource_path",
+      "input": {
+        "method": "GET",
+        "path": "/.well-known/oauth-protected-resource/mcp"
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"resource\":\"https://notes.example/mcp\",\"authorization_servers\":[\"https://sso.example\"],\"scopes_supported\":[\"notes.read\",\"notes.write\"],\"bearer_methods_supported\":[\"header\"],\"resource_signing_alg_values_supported\":[\"RS256\"]}\n"
+      }
+    },
+    {
+      "name": "metadata_at_bare_path",
+      "input": {
+        "method": "GET",
+        "path": "/.well-known/oauth-protected-resource"
+      },
+      "want": {
+        "status": 200,
+        "content_type": "application/json",
+        "body": "{\"resource\":\"https://notes.example/mcp\",\"authorization_servers\":[\"https://sso.example\"],\"scopes_supported\":[\"notes.read\",\"notes.write\"],\"bearer_methods_supported\":[\"header\"],\"resource_signing_alg_values_supported\":[\"RS256\"]}\n"
+      }
+    }
+  ]
+}

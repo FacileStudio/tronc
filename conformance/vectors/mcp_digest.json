@@ -1,0 +1,83 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "mcp_digest",
+  "cases": [
+    {
+      "name": "none",
+      "input": {
+        "fields": []
+      },
+      "want": {
+        "digest": "e3b0c44298fc1c149afbf4c8996fb924"
+      }
+    },
+    {
+      "name": "one_empty",
+      "input": {
+        "fields": [
+          ""
+        ]
+      },
+      "want": {
+        "digest": "e3b0c44298fc1c149afbf4c8996fb924"
+      }
+    },
+    {
+      "name": "one",
+      "input": {
+        "fields": [
+          "hello"
+        ]
+      },
+      "want": {
+        "digest": "2cf24dba5fb0a30e26e83b2ac5b9e29e"
+      }
+    },
+    {
+      "name": "two",
+      "input": {
+        "fields": [
+          "a",
+          "b"
+        ]
+      },
+      "want": {
+        "digest": "59b271ae1bbcb1d31d41929817f4b16f"
+      }
+    },
+    {
+      "name": "joined_differs",
+      "input": {
+        "fields": [
+          "ab"
+        ]
+      },
+      "want": {
+        "digest": "fb8e20fc2e4c3f248c60c39bd652f3c1"
+      }
+    },
+    {
+      "name": "unicode",
+      "input": {
+        "fields": [
+          "réunion",
+          "été"
+        ]
+      },
+      "want": {
+        "digest": "b060de7b0743d62d961be6963971eed1"
+      }
+    },
+    {
+      "name": "embedded_nul",
+      "input": {
+        "fields": [
+          "a\u0000b"
+        ]
+      },
+      "want": {
+        "digest": "59b271ae1bbcb1d31d41929817f4b16f"
+      }
+    }
+  ]
+}

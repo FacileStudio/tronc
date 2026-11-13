@@ -6,6 +6,72 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.23.0] - Unreleased
+
+Rust: ported in tronc-rs v0.5.0; TS: ported in tronc-ts v0.3.0. Each entry names the port's
+counterpart.
+
+### Added
+
+- **`mcp.AppSpec.Scopes`**, so a read-only server (sonar) goes through `NewApp` with
+  `Scopes{Read: "<app>.read"}` instead of copying it. Rust: tronc-rs `App::new`. TS: has
+  read-only servers already.
+- **`mcp.StateKey(app, secret)`**: SHA-256 over `<app>-mcp-state:<secret>`, byte for byte the key
+  the thirteen apps derived by hand, so signed questions survive the move. Vector
+  `mcp_state_key.json`. Rust: `state_key`. TS: `stateKey`.
+- **Bounded pending actions.** `Request` asks about the person's open action of the same kind,
+  target and digest instead of inserting another, on the link and the MRTR paths.
+  `PostgresPending.Open` reads at most `OpenLimit` + 1 rows; `Confirmations.List` keeps
+  `OpenLimit` (100) and reports `truncated`, which `PendingList` carries as
+  `"truncated": true`. `PostgresPending.Prune`, `PrunePending(ctx, exec, olderThan)` and
+  `KeepPruned(ctx, store, every, olderThan, logger)` delete the actions resolved or expired
+  more than 30 days ago, hourly. No migration or index. A Postgres-backed test pins that prune
+  spares open, recently resolved and recently expired actions. The dedupe is best effort, and a
+  reused action keeps its first client and expiry. Rust: dedupe, limit, prune. TS: same.
+- **Confirmation text.** `Outcome.Message` carries the standard "Nothing happened yet…" text
+  (`Confirmations.Waiting()`, naming the pending lifetime, or the time a reused action has left)
+  on a link, and `MessageDeclined` on a declined `Resume`, the text eight apps each kept a copy
+  of. Rust: ask/resume helper. TS: same.
+- **`PendingPage.Mount(router, auth...)`** mounts the confirm page API at `/mcp/pending`
+  (`PendingAPIPath`) behind the app's auth, nil-safe for docs tests. Rust: `PendingPage` router.
+  TS: Go-only for now, tronc-ts has no confirm page.
+- **Offset pager** `Page(items, cursor, size)`, `Offset(cursor)` and `Cursor(offset, total)`, the
+  copies in Plume, Casier and Echo. Rust: pager. TS: same.
+- **`mcp.PlanLimit`**: `Failure` maps any error with `PlanLimit() (feature, upgradeURL)`, such as
+  porte's `forfait.LimitError` once it gains the method, to "The plan limit for <feature> is
+  reached. Upgrade at <url>". Rust and TS: same text.
+- **Typed Bulle AI calls.** `bulle.Client.Complete(ctx, CompleteRequest{System, Prompt, Input,
+  Schema, MaxTokens, SpaceID})` for `POST /api/ai/complete` as the user, and
+  `DecideAI(ctx, DecideRequest{ActingFor, State, Questions})` for `POST /api/ai/decide` as the
+  app's service with `X-Bulle-Acting-For`. `SpaceID` is omitted when empty, so it is safe before
+  Bulle accepts it. `Request.Header` adds headers to `Call`. `PlanRequired.Limit` carries a
+  402's `limit`. Rust: `complete(space_id)`. TS: `complete`, `decideAI`.
+- **Conformance vectors** for `mcp` and `bulle`: `mcp_http` (401 and 403 challenges, write gate,
+  Origin refusal, 405, RFC 9728 metadata), `mcp_rate_limit` (default burst 120, burst equal to the
+  per-minute limit, one bucket per user, none depending on replay speed), `mcp_digest`, `mcp_state_key`, `mcp_failure`, `bulle_errors` (402 bare and
+  enveloped, upgrade URL filter, 4xx, 5xx, redirect) and `bulle_paths`. Their `source` is
+  `tronc@v0.23.0`; the eight older files are unchanged. Rust: consume in CI. TS: same.
+
+### Changed
+
+- **`mcp.Failure`** keeps an `unavailable` error's message instead of the generic text, and
+  re-checks a `payment_required` upgrade URL with `errors.SafeUpgradeURL`. Rust and TS: align.
+- **`bulle.Client` never follows a redirect**: a 3xx fails as `ErrUnreachable`, so the token
+  never leaves for another URL. It works on a copy of `Config.HTTPClient`. Rust: redirect-refusing
+  client. TS: same.
+- **Annotations rule** written into `mcp.Annotations` and docs/api.md: overwriting or removing
+  the user's data, or silencing an alert, is `Destructive`; only a tool with no further effect
+  on a repeat call is `Idempotent`. Docs only; Rust and TS: annotation presets.
+- **build(deps)**: the root module requires `jackc/pgx/v5` v5.9.2 for the Postgres-backed prune
+  test, which runs when `TEST_DATABASE_URL` is set (CI sets it), and moves `golang.org/x/text` to
+  v0.41.0 and `golang.org/x/sync` to v0.22.0, the versions `testdb` already uses. No package
+  outside the tests imports pgx.
+
+### Fixed
+
+- **`mcp.Failure` capitalised one byte**, so a message starting with an accented letter
+  ("échec") came out garbled. It now uppercases the first rune. Rust and TS were already right.
+
 ## [0.22.2] - 2026-11-11
 
 ### Security

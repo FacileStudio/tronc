@@ -1,0 +1,46 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "mcp_state_key",
+  "cases": [
+    {
+      "name": "courrier",
+      "input": {
+        "app": "courrier",
+        "secret": "encryption-key"
+      },
+      "want": {
+        "key_hex": "34ffff6cdd350c57b27a8318ee73a34c441105c04354e0acc344bb8f8e98fdbc"
+      }
+    },
+    {
+      "name": "opus",
+      "input": {
+        "app": "opus",
+        "secret": "s3cret"
+      },
+      "want": {
+        "key_hex": "da630e64c58b3e5aba27eb17e725a008f20b65b06020e090c4b10a9c2735b784"
+      }
+    },
+    {
+      "name": "empty_secret",
+      "input": {
+        "app": "agenda",
+        "secret": ""
+      },
+      "want": {
+        "key_hex": "cf611e4b54ff2c639b49351a2d686177c8d7d3bb0c42e35b1dcc93d370af508a"
+      }
+    },
+    {
+      "name": "unicode_secret",
+      "input": {
+        "app": "plume",
+        "secret": "clé secrète"
+      },
+      "want": {
+        "key_hex": "5c6542666a77ac4e5ecc3ef93e9247543072cff7fdf6a8e83e7899866c6421f6"
+      }
+    }
+  ]
+}
