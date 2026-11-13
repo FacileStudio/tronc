@@ -607,12 +607,26 @@ practice (audience `bulle`, scopes `bulle.read` and `bulle.write`).
 - `Ideas(ctx, app, space)`, `Generate(ctx, app, space)`, `Run(ctx, ideaID, space)`,
   `RunStatus(ctx, runID)`, `Decide(ctx, runID, callID, approve)`, `Dismiss(ctx, ideaID)`.
   `space` is a Registre shared space id, or `""` for the personal space.
-- `Call(ctx, Request{Method, Segments, Query, Body}, out)` for any other route. Each segment is
-  escaped on its own; an empty, `.` or `..` segment is `ErrBadSegment` and sends nothing.
-- Errors: a 402 is `*PlanRequired{Message, UpgradeURL, Key}`, read from a bare body or from the
-  `{"error":{...}}` envelope (an unsafe `upgrade_url` is dropped). Any other 4xx is
-  `*StatusError{Status, Code, Message}`. A 5xx, a timeout or a network error wraps
-  `ErrUnreachable`.
+- `Complete(ctx, CompleteRequest{System, Prompt, Input, Schema, MaxTokens, SpaceID})` calls
+  `POST /api/ai/complete` as the user and returns `Completion{Text, JSON, Model}`: `JSON` when a
+  schema was sent. `Input` is untrusted data Bulle fences off from the prompt. `SpaceID` names the
+  Registre space the request is for, whose plan may grant AI; leave it empty for the personal
+  scope. Bulle caps the call (system 4 KiB, prompt 8 KiB, input 64 KiB, 4096 tokens) and the user
+  (200 a day, then a 429). Give this client a longer timeout, such as 90 s.
+- `DecideAI(ctx, DecideRequest{ActingFor, State, Questions})` calls `POST /api/ai/decide` as the
+  app's service: the `TokenSource` returns the service key Bulle knows the app by, and
+  `ActingFor` is the user's email, sent as `X-Bulle-Acting-For`. An empty `ActingFor` is
+  `ErrNoActingFor` and sends nothing. It returns `Decision{Answers, Model, Usage}`.
+- `Call(ctx, Request{Method, Segments, Query, Body, Header}, out)` for any other route. Each
+  segment is escaped on its own; an empty, `.` or `..` segment is `ErrBadSegment` and sends
+  nothing. `Header` adds headers and never replaces `Authorization`.
+- The client never follows a redirect, so the token never leaves for another URL: a 3xx fails
+  as `ErrUnreachable`. It works on a copy of `Config.HTTPClient`.
+- Errors: a 402 is `*PlanRequired{Message, UpgradeURL, Key, Limit}`, read from a bare body or
+  from the `{"error":{...}}` envelope (an unsafe `upgrade_url` is dropped). Any other 4xx is
+  `*StatusError{Status, Code, Message}`. A 3xx, a 5xx, a timeout or a network error wraps
+  `ErrUnreachable`. `conformance/vectors/bulle_errors.json` and `bulle_paths.json` pin the
+  mapping and the escaping.
 - `RunStatus` adds `State` (`running`, `needs_approval`, `done`, `failed`) and `ContinueURL`, clears
   output URLs that are not http or https, and never carries Bulle's `decide_path`.
 
@@ -643,12 +657,16 @@ func Failure(err error, hint string) error
 func Audit(ctx context.Context, logger *slog.Logger, e Event)
 
 func NewApp(cfg AppConfig, spec AppSpec) (*App, error)
+func StateKey(app, secret string) []byte
+func (p *PendingPage[T]) Mount(router chi.Router, auth ...func(http.Handler) http.Handler)
 func (p *PendingPage[T]) Routes(r chi.Router)
 func (p *PendingPage[T]) List(ctx, userID string) (PendingList[T], error)
 func PendingRoutes[T any](doc PendingDoc) []apiref.Route
 func Digest(fields ...string) string
 func TargetIDs(a Action, refusal error) (userID, targetID int64, err error)
 func ErasePending(ctx, exec Execer, userIDs ...string) error
+func PrunePending(ctx, exec Execer, olderThan time.Duration) (int64, error)
+func KeepPruned(ctx, store Pruner, every, olderThan time.Duration, logger *slog.Logger)
 
 func NewConfirmations(cfg ConfirmConfig) (*Confirmations, error)
 func (c *Confirmations) Request(ctx, req, kind, target, question string) (*sdk.CallToolResult, Outcome, error)
@@ -656,6 +674,8 @@ func (c *Confirmations) Resume(ctx, req, kind string) (Outcome, error)
 func (c *Confirmations) Confirm(ctx, who Caller, id string) (Outcome, error)
 func (c *Confirmations) Dismiss(ctx, who Caller, id string) error
 func (c *Confirmations) Open(ctx, userID string) ([]Action, error)
+func (c *Confirmations) List(ctx, userID string) ([]Action, bool, error)
+func (c *Confirmations) Waiting() string
 func (c *Confirmations) State(ctx, a Action) string
 func CanElicit(req *sdk.CallToolRequest) bool
 func Retrying(req *sdk.CallToolRequest) bool
@@ -666,6 +686,9 @@ func DecodeCursor(cursor string, position any) error
 func FitCount(total int, size func(n int) int) int
 func EncodedSize(v any) int
 func Clip(text string, limit int) (string, bool)
+func Page[T any](items []T, cursor string, size int) ([]T, string, error)
+func Offset(cursor string) (int, error)
+func Cursor(offset, total int) string
 ```
 
 `Mount` serves the endpoint at the path of `Options.Resource` and the RFC 9728 document at
@@ -681,26 +704,49 @@ rate limit.
   a description and `Annotations`; all four hints go on the wire, because clients read a
   missing destructive or open-world hint as true. A tool that is not `ReadOnly` needs the write
   scope. tools/list is sorted by name.
+- **Annotations rule.** Clients auto-approve on the hints, so the suite reads them strictly. A
+  tool that overwrites or removes the user's data, or silences an alert, is `Destructive`: an
+  update of fields, a draft or artifact replaced by id or name, a delete, an alert turned off.
+  A tool that only adds is not. Only a tool whose repeat call has no further effect is
+  `Idempotent`; one that asks for a confirmation, sends or creates on each call is not.
 - **Errors.** Return `Failure(err, hint)` from a tool: a `not_found` keeps its message plus the
-  hint (name the tool that lists valid ids), a bad argument keeps its message, anything else
-  becomes `ErrUnavailable`.
+  hint (name the tool that lists valid ids), a bad argument or an `unavailable` keeps its
+  message, a `payment_required` or a `PlanLimit` (porte's `forfait.LimitError` once it has the
+  method) names the upgrade page when it is safe to show, and anything else becomes
+  `ErrUnavailable`. The first letter is capitalised as a rune, so "échec" becomes "Échec".
+  `conformance/vectors/mcp_failure.json` pins every case.
 - **Confirmations.** A sensitive tool calls `Resume` when `Retrying(req)`, else `Request`.
   `Request` returns an `input_required` result to return as is when the client can elicit;
-  otherwise `Outcome.Status` is `pending_confirmation` and `Outcome.ConfirmURL` the link. Put
-  `status` and `confirm_url` in the tool's output: mcptest reads those names. `Kind.Fingerprint`
+  otherwise `Outcome.Status` is `pending_confirmation`, `Outcome.ConfirmURL` the link and
+  `Outcome.Message` the standard "Nothing happened yet…" text (`Waiting()`). A declined `Resume`
+  carries `MessageDeclined`. Put `status`, `confirm_url` and `message` in the tool's output:
+  mcptest reads the first two. `Request` asks about the person's open action of the same kind,
+  target and digest instead of opening a second one, so an agent that loops opens one action. `Kind.Fingerprint`
   must change whenever the target changes, so a confirmation never runs on content the person
   did not see. The app's confirm page lists `Open`, shows `State`, and calls `Confirm` or
   `Dismiss`; it must refuse a delegated token, because an agent never confirms its own request.
 - **Storage.** `PostgresPending{DB}` over `mcp_actions`; run `PendingSchema` with the app's
   migrations. An account erasure deletes the person's actions with `Pending.Erase`, or with
   `ErasePending(ctx, tx, ids...)` inside its own transaction (`tx.Statement.ConnPool` on GORM).
+  `Open` reads at most `OpenLimit` + 1 (101) rows; `Confirmations.List` keeps `OpenLimit` and
+  reports whether it cut any. Nothing else bounds the table, so start
+  `go mcp.KeepPruned(ctx, mcp.PostgresPending{DB: sqlDB}, 0, 0, logger)` in `main`: it deletes
+  the actions resolved or expired more than 30 days ago (`DefaultPruneAfter`), at start and
+  every hour (`DefaultPruneEvery`). It needs no new index or migration.
+- **State key.** `StateKey(app, secret)` is SHA-256 over `<app>-mcp-state:<secret>`, the key all
+  thirteen apps derived by hand, so questions signed before an app adopts it still verify. Pass
+  the same secret the app used (its encryption key or its OIDC client secret).
 - **App glue.** `NewApp(AppConfig, AppSpec)` is the whole of an app's `NewService` wiring: it
   checks the resource, builds the confirmations with the confirm page at the origin's
-  `/pending`, and the server with `PerMinute` calls a minute (default 120, burst as many).
+  `/pending`, and the server with `PerMinute` calls a minute (default 120, burst as many, one
+  bucket per user). `AppSpec.Scopes` takes `Scopes{Read: "<app>.read"}` alone for a read-only
+  server.
   `AppConfig` is what `main` fills; `AppSpec` is what the module declares. Tools and kinds may
   close over a toolset whose `confirm` field is set from `App.Confirmations` afterwards.
 - **Confirm page.** `PendingPage[T]` serves `GET /`, `POST /{id}/confirm` and
-  `POST /{id}/dismiss`; mount `Routes` at `/mcp/pending` behind the app's auth. `User` returns
+  `POST /{id}/dismiss`; `Mount(apiRouter, requireAuth)` mounts them at `/mcp/pending`
+  (`PendingAPIPath`) behind the app's auth, and works on a nil page for docs tests. The list
+  is `{"actions":[…]}` plus `"truncated":true` past `OpenLimit`. `User` returns
   the signed-in id and must refuse anything but the person's own session (`ErrDelegated`).
   `Describe` adds the target to the shared `PendingItem`, which the app's item type embeds.
   `Done` picks the confirm result (nil answers `done`). `PendingRoutes[T](PendingDoc)` documents
@@ -708,12 +754,16 @@ rate limit.
 - **Targets.** `Digest(fields...)` is the fingerprint every app used (hex of the first 16 bytes
   of SHA-256 over NUL-joined fields), so open actions survive the move. `TargetIDs` reads an
   action whose user id and target are both decimal ids.
+- **Offset pages.** `Page(items, cursor, size)` cuts one page of a slice and returns the next
+  cursor, empty on the last page. For a database query, read the start with `Offset(cursor)`
+  and make the next cursor with `Cursor(next, total)`. A cursor that is not one of these is
+  `ErrCursor`.
 
 ```go
 verifier, err := mcpauth.Verifier(ctx, mcpauth.Config{Issuer: issuer, Resource: resource, ScopePrefix: "agenda", Identities: identities})
 tools := &toolset{events: events}
 app, err := mcp.NewApp(mcp.AppConfig{
-	Resource: resource, Issuer: issuer, Version: version, StateKey: stateKey,
+	Resource: resource, Issuer: issuer, Version: version, StateKey: mcp.StateKey("agenda", encryptionKey),
 	Verifier: verifier, Pending: mcp.PostgresPending{DB: sqlDB}, Logger: logger,
 }, mcp.AppSpec{
 	Name: "agenda", Title: "Agenda", Instructions: instructions,
@@ -723,7 +773,8 @@ app, err := mcp.NewApp(mcp.AppConfig{
 tools.confirm = app.Confirmations
 app.Server.Mount(rootRouter)
 page := &mcp.PendingPage[PendingItem]{Confirmations: app.Confirmations, Actor: "agenda-web", User: pageUser, Describe: tools.describe}
-apiRouter.Route("/mcp/pending", func(r chi.Router) { r.Use(requireAuth); page.Routes(r) })
+page.Mount(apiRouter, requireAuth)
+go mcp.KeepPruned(ctx, mcp.PostgresPending{DB: sqlDB}, 0, 0, logger)
 ```
 
 ### `mcp/mcptest`

@@ -1,0 +1,239 @@
+{
+  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "subject": "mcp_failure",
+  "cases": [
+    {
+      "name": "not_found_adds_hint",
+      "input": {
+        "code": "not_found",
+        "message": "note not found",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Note not found. Call notes_list for the note ids."
+      }
+    },
+    {
+      "name": "not_found_without_hint",
+      "input": {
+        "code": "not_found",
+        "message": "note not found",
+        "hint": ""
+      },
+      "want": {
+        "text": "Note not found."
+      }
+    },
+    {
+      "name": "invalid_argument_keeps_message",
+      "input": {
+        "code": "invalid_argument",
+        "message": "title is required",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Title is required"
+      }
+    },
+    {
+      "name": "failed_precondition",
+      "input": {
+        "code": "failed_precondition",
+        "message": "only drafts can be sent",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Only drafts can be sent"
+      }
+    },
+    {
+      "name": "already_exists",
+      "input": {
+        "code": "already_exists",
+        "message": "a note with that name exists",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "A note with that name exists"
+      }
+    },
+    {
+      "name": "permission_denied",
+      "input": {
+        "code": "permission_denied",
+        "message": "only the owner can delete it",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Only the owner can delete it"
+      }
+    },
+    {
+      "name": "rate_limited",
+      "input": {
+        "code": "rate_limited",
+        "message": "too many rooms this minute",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Too many rooms this minute"
+      }
+    },
+    {
+      "name": "resource_exhausted",
+      "input": {
+        "code": "resource_exhausted",
+        "message": "the file is too large",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "The file is too large"
+      }
+    },
+    {
+      "name": "unavailable_keeps_message",
+      "input": {
+        "code": "unavailable",
+        "message": "bulle did not answer",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Bulle did not answer"
+      }
+    },
+    {
+      "name": "internal_hidden",
+      "input": {
+        "code": "internal",
+        "message": "pq: connection refused",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "the app could not finish this request. Retry once; if it fails again, tell the user"
+      }
+    },
+    {
+      "name": "unauthenticated_hidden",
+      "input": {
+        "code": "unauthenticated",
+        "message": "missing auth",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "the app could not finish this request. Retry once; if it fails again, tell the user"
+      }
+    },
+    {
+      "name": "raw_error_hidden",
+      "input": {
+        "message": "dial tcp: refused",
+        "hint": "Call notes_list for the note ids.",
+        "raw": true
+      },
+      "want": {
+        "text": "the app could not finish this request. Retry once; if it fails again, tell the user"
+      }
+    },
+    {
+      "name": "accented_first_letter",
+      "input": {
+        "code": "invalid_argument",
+        "message": "échec de l'envoi",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Échec de l'envoi"
+      }
+    },
+    {
+      "name": "accented_not_found",
+      "input": {
+        "code": "not_found",
+        "message": "élément introuvable",
+        "hint": "Call notes_list for the note ids."
+      },
+      "want": {
+        "text": "Élément introuvable. Call notes_list for the note ids."
+      }
+    },
+    {
+      "name": "payment_required_with_link",
+      "input": {
+        "code": "payment_required",
+        "message": "you used today's searches",
+        "upgrade_url": "https://sso.example/spaces",
+        "hint": ""
+      },
+      "want": {
+        "text": "You used today's searches. Upgrade at https://sso.example/spaces"
+      }
+    },
+    {
+      "name": "payment_required_trailing_period",
+      "input": {
+        "code": "payment_required",
+        "message": "no AI on this plan.",
+        "upgrade_url": "/billing",
+        "hint": ""
+      },
+      "want": {
+        "text": "No AI on this plan. Upgrade at /billing"
+      }
+    },
+    {
+      "name": "payment_required_without_link",
+      "input": {
+        "code": "payment_required",
+        "message": "no AI on this plan",
+        "hint": ""
+      },
+      "want": {
+        "text": "No AI on this plan."
+      }
+    },
+    {
+      "name": "payment_required_unsafe_link_dropped",
+      "input": {
+        "code": "payment_required",
+        "message": "no AI on this plan",
+        "upgrade_url": "javascript:alert(1)",
+        "hint": ""
+      },
+      "want": {
+        "text": "No AI on this plan."
+      }
+    },
+    {
+      "name": "plan_limit_with_link",
+      "input": {
+        "upgrade_url": "https://sso.example/spaces/7",
+        "hint": "",
+        "plan_limit_feature": "rooms"
+      },
+      "want": {
+        "text": "The plan limit for rooms is reached. Upgrade at https://sso.example/spaces/7"
+      }
+    },
+    {
+      "name": "plan_limit_without_link",
+      "input": {
+        "hint": "",
+        "plan_limit_feature": "storage"
+      },
+      "want": {
+        "text": "The plan limit for storage is reached."
+      }
+    },
+    {
+      "name": "plan_limit_unsafe_link_dropped",
+      "input": {
+        "upgrade_url": "http://sso.example/spaces",
+        "hint": "",
+        "plan_limit_feature": "rooms"
+      },
+      "want": {
+        "text": "The plan limit for rooms is reached."
+      }
+    }
+  ]
+}

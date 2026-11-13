@@ -44,6 +44,7 @@ type noteList struct {
 type deleteOutput struct {
 	Status     string `json:"status"`
 	ConfirmURL string `json:"confirm_url,omitempty"`
+	Message    string `json:"message,omitempty"`
 }
 
 // noteInput is the input of notes_write.
@@ -106,13 +107,13 @@ func (n *notes) write(_ context.Context, _ *sdk.CallToolRequest, in noteInput) (
 func (n *notes) delete(ctx context.Context, req *sdk.CallToolRequest, in noteRef) (*sdk.CallToolResult, deleteOutput, error) {
 	if mcp.Retrying(req) {
 		outcome, err := n.confirm.Resume(ctx, req, "delete")
-		return nil, deleteOutput{Status: outcome.Status}, mcp.Failure(err, "Call notes_delete again.")
+		return nil, deleteOutput{Status: outcome.Status, Message: outcome.Message}, mcp.Failure(err, "Call notes_delete again.")
 	}
 	result, outcome, err := n.confirm.Request(ctx, req, "delete", in.ID, fmt.Sprintf("Delete note %s?", in.ID))
 	if err != nil {
 		return nil, deleteOutput{}, mcp.Failure(err, "Call notes_list for the note ids.")
 	}
-	return result, deleteOutput{Status: outcome.Status, ConfirmURL: outcome.ConfirmURL}, nil
+	return result, deleteOutput{Status: outcome.Status, ConfirmURL: outcome.ConfirmURL, Message: outcome.Message}, nil
 }
 
 // tools is the curated set.
@@ -176,7 +177,7 @@ func serve(t *testing.T) (*notes, string) {
 			return mcp.PendingResult{Status: "deleted", URL: o.Action.Target}
 		},
 	}
-	router.Route("/api/mcp/pending", page.Routes)
+	router.Route("/api", func(r chi.Router) { page.Mount(r) })
 	return n, srv.URL + "/mcp"
 }
 

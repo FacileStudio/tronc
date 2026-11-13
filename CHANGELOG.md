@@ -6,6 +6,69 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.23.0] - Unreleased
+
+Ports: each entry names the tronc-rs and tronc-ts work it needs. The issues are opened with
+the release; until then the port is tracked in the suite hardening plan (A4 tronc-ts v0.3.0,
+A5 tronc-rs v0.5.0).
+
+### Added
+
+- **`mcp.AppSpec.Scopes`**, so a read-only server (sonar) goes through `NewApp` with
+  `Scopes{Read: "<app>.read"}` instead of copying it. Rust: tronc-rs `App::new` (A5). TS: has
+  read-only servers already.
+- **`mcp.StateKey(app, secret)`**: SHA-256 over `<app>-mcp-state:<secret>`, byte for byte the key
+  the thirteen apps derived by hand, so signed questions survive the move. Vector
+  `mcp_state_key.json`. Rust: `state_key` (A5). TS: `stateKey` (A4).
+- **Bounded pending actions.** `Request` asks about the person's open action of the same kind,
+  target and digest instead of inserting another, on the link and the MRTR paths.
+  `PostgresPending.Open` reads at most `OpenLimit` + 1 rows; `Confirmations.List` keeps
+  `OpenLimit` (100) and reports `truncated`, which `PendingList` carries as
+  `"truncated": true`. `PostgresPending.Prune`, `PrunePending(ctx, exec, olderThan)` and
+  `KeepPruned(ctx, store, every, olderThan, logger)` delete the actions resolved or expired
+  more than 30 days ago, hourly. No migration or index. Rust: dedupe, limit, prune (A5). TS: same
+  (A4).
+- **Confirmation text.** `Outcome.Message` carries the standard "Nothing happened yet…" text
+  (`Confirmations.Waiting()`, naming the pending lifetime) on a link, and `MessageDeclined` on a
+  declined `Resume`, the text eight apps each kept a copy of. Rust: ask/resume helper (A5). TS:
+  (A4).
+- **`PendingPage.Mount(router, auth...)`** mounts the confirm page API at `/mcp/pending`
+  (`PendingAPIPath`) behind the app's auth, nil-safe for docs tests. Rust: `PendingPage` router
+  (A5). TS: Go-only for now, tronc-ts has no confirm page.
+- **Offset pager** `Page(items, cursor, size)`, `Offset(cursor)` and `Cursor(offset, total)`, the
+  copies in Plume, Casier and Echo. Rust: pager (A5). TS: (A4).
+- **`mcp.PlanLimit`**: `Failure` maps any error with `PlanLimit() (feature, upgradeURL)`, such as
+  porte's `forfait.LimitError` once it gains the method, to "The plan limit for <feature> is
+  reached. Upgrade at <url>". Rust and TS: same text (A4, A5).
+- **Typed Bulle AI calls.** `bulle.Client.Complete(ctx, CompleteRequest{System, Prompt, Input,
+  Schema, MaxTokens, SpaceID})` for `POST /api/ai/complete` as the user, and
+  `DecideAI(ctx, DecideRequest{ActingFor, State, Questions})` for `POST /api/ai/decide` as the
+  app's service with `X-Bulle-Acting-For`. `SpaceID` is omitted when empty, so it is safe before
+  Bulle accepts it. `Request.Header` adds headers to `Call`. `PlanRequired.Limit` carries a
+  402's `limit`. Rust: `complete(space_id)` (A5). TS: `complete`, `decideAI` (A4).
+- **Conformance vectors** for `mcp` and `bulle`: `mcp_http` (401 and 403 challenges, write gate,
+  Origin refusal, 405, RFC 9728 metadata), `mcp_rate_limit` (120 a minute, burst 120, one bucket
+  per user), `mcp_digest`, `mcp_state_key`, `mcp_failure`, `bulle_errors` (402 bare and
+  enveloped, upgrade URL filter, 4xx, 5xx, redirect) and `bulle_paths`. Their `source` is
+  `tronc@v0.23.0`; the eight older files are unchanged. Rust: consume in CI (A5). TS: (A4).
+
+### Changed
+
+- **`mcp.Failure`** keeps an `unavailable` error's message instead of the generic text, and
+  re-checks a `payment_required` upgrade URL with `errors.SafeUpgradeURL`. Rust and TS: align
+  (A4, A5).
+- **`bulle.Client` never follows a redirect**: a 3xx fails as `ErrUnreachable`, so the token
+  never leaves for another URL. It works on a copy of `Config.HTTPClient`. Rust: redirect-refusing
+  client (A5). TS: (A4).
+- **Annotations rule** written into `mcp.Annotations` and docs/api.md: overwriting or removing
+  the user's data, or silencing an alert, is `Destructive`; only a tool with no further effect
+  on a repeat call is `Idempotent`. Docs only; Rust and TS: annotation presets (A5).
+
+### Fixed
+
+- **`mcp.Failure` capitalised one byte**, so a message starting with an accented letter
+  ("échec") came out garbled. It now uppercases the first rune. Rust and TS were already right.
+
 ## [0.22.2] - 2026-11-11
 
 ### Security
