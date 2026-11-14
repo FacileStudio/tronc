@@ -40,17 +40,18 @@ type limitError struct{ key, link string }
 func (e *limitError) Error() string                     { return "forfait: plan limit reached" }
 func (e *limitError) PlanLimit() (feature, link string) { return e.key, e.link }
 
-// TestFailureMapsPlanLimitsAndOutages checks a PlanLimit names its upgrade
-// page, an unsafe page is dropped, an outage keeps its message, and an
+// TestFailureMapsPlanLimitsAndOutages checks a PlanLimit says nothing was
+// done, names a known feature readably and an unknown one by its key, names
+// its upgrade page, an unsafe page is dropped, an outage keeps its message, and an
 // accented first letter is capitalised whole.
 func TestFailureMapsPlanLimitsAndOutages(t *testing.T) {
 	cases := map[string]struct {
 		err  error
 		want string
 	}{
-		"plan limit":         {&limitError{"rooms", "https://sso.example/spaces/1"}, "The plan limit for rooms is reached. Upgrade at https://sso.example/spaces/1"},
-		"unsafe page":        {&limitError{"rooms", "javascript:alert(1)"}, "The plan limit for rooms is reached."},
-		"wrapped limit":      {fmtWrap(&limitError{"storage", ""}), "The plan limit for storage is reached."},
+		"plan limit":         {&limitError{"rooms", "https://sso.example/spaces/1"}, "Nothing was done: the plan limit for rooms is reached. Upgrade at https://sso.example/spaces/1"},
+		"unsafe page":        {&limitError{"rooms", "javascript:alert(1)"}, "Nothing was done: the plan limit for rooms is reached."},
+		"wrapped limit":      {fmtWrap(&limitError{"nuage.storage_gb", ""}), "Nothing was done: the plan limit for storage is reached."},
 		"unavailable":        {errors.Unavailable("bulle did not answer"), "Bulle did not answer"},
 		"accented":           {errors.Invalid("échec de l'envoi"), "Échec de l'envoi"},
 		"accented not_found": {errors.NotFound("élément introuvable"), "Élément introuvable. Call x."},

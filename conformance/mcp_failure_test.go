@@ -51,6 +51,8 @@ func mcpFailureVectors(t *testing.T) []vector {
 		{"payment_required_unsafe_link_dropped", mcpFailureInput{Code: "payment_required", Message: "no AI on this plan", UpgradeURL: "javascript:alert(1)"}},
 		{"plan_limit_with_link", mcpFailureInput{PlanLimit: "rooms", UpgradeURL: "https://sso.example/spaces/7"}},
 		{"plan_limit_without_link", mcpFailureInput{PlanLimit: "storage"}},
+		{"plan_limit_known_key_readable", mcpFailureInput{PlanLimit: "nuage.storage_gb", UpgradeURL: "https://sso.example/spaces/7"}},
+		{"plan_limit_unknown_key_raw", mcpFailureInput{PlanLimit: "plume.notes"}},
 		{"plan_limit_unsafe_link_dropped", mcpFailureInput{PlanLimit: "rooms", UpgradeURL: "http://sso.example/spaces"}},
 	}
 	cases := make([]vector, 0, len(inputs))

@@ -22,6 +22,7 @@ const (
 	source  = "github.com/FacileStudio/tronc@871cd90"
 	release = "github.com/FacileStudio/tronc@v0.23.0"
 	patch   = "github.com/FacileStudio/tronc@v0.23.1"
+	failure = "github.com/FacileStudio/tronc@v0.23.2"
 )
 
 var update = flag.Bool("update", false, "rewrite conformance/vectors from the code")
@@ -63,7 +64,7 @@ var sources = map[string]string{
 	"mcp_rate_limit": release,
 	"mcp_digest":     release,
 	"mcp_state_key":  release,
-	"mcp_failure":    release,
+	"mcp_failure":    failure,
 	"bulle_errors":   patch,
 	"bulle_paths":    release,
 }
