@@ -136,6 +136,46 @@ func TestStatusesKeepTheirMeaning(t *testing.T) {
 	}
 }
 
+func TestStatusErrorCarriesRetryAfter(t *testing.T) {
+	later := time.Now().Add(90 * time.Second).UTC().Format(http.TimeFormat)
+	cases := []struct {
+		name, header string
+		status       int
+		min, max     time.Duration
+		unreachable  bool
+	}{
+		{"429 seconds", "120", 429, 120 * time.Second, 120 * time.Second, false},
+		{"429 http date", later, 429, 80 * time.Second, 91 * time.Second, false},
+		{"429 none", "", 429, 0, 0, false},
+		{"429 unreadable", "soon", 429, 0, 0, false},
+		{"429 past date", "Wed, 21 Oct 2015 07:28:00 GMT", 429, 0, 0, false},
+		{"429 capped", "99999999999999", 429, 24 * time.Hour, 24 * time.Hour, false},
+		{"503 seconds", "30", 503, 30 * time.Second, 30 * time.Second, true},
+	}
+	for _, c := range cases {
+		f := newFakeBulle(t, func(w http.ResponseWriter, _ *http.Request) {
+			if c.header != "" {
+				w.Header().Set("Retry-After", c.header)
+			}
+			writeJSON(w, c.status, `{"error":{"code":"rate_limited","message":"later"}}`)
+		})
+		_, err := newClient(t, f).Generate(context.Background(), "opus", "")
+		var refused *bulle.StatusError
+		if !errors.As(err, &refused) || refused.Status != c.status || refused.RetryAfter < c.min || refused.RetryAfter > c.max {
+			t.Fatalf("%s: err = %#v", c.name, err)
+		}
+		if errors.Is(err, bulle.ErrUnreachable) != c.unreachable {
+			t.Fatalf("%s: unreachable = %v", c.name, !c.unreachable)
+		}
+	}
+	f := newFakeBulle(t, fixed(503, `{"error":{"code":"unavailable","message":"x"}}`))
+	_, err := newClient(t, f).Generate(context.Background(), "opus", "")
+	var refused *bulle.StatusError
+	if errors.As(err, &refused) || !errors.Is(err, bulle.ErrUnreachable) {
+		t.Fatalf("503 without Retry-After stays unreachable: %#v", err)
+	}
+}
+
 func TestPathsAreEscapedSegments(t *testing.T) {
 	f := newFakeBulle(t, fixed(202, `{"run_id":"r1"}`))
 	client := newClient(t, f)
