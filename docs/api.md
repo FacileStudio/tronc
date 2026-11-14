@@ -821,7 +821,11 @@ func WithOnError(f func(error)) Option      // failed attempt or lost connection
 
 `Hold` blocks until `ctx` ends. While this replica holds the lock it calls `run` with a context
 that is cancelled when the lock is lost or `ctx` ends. `run` must return soon after that: the
-lock is released only after `run` returns, so two replicas never run the job at once. Typical
+lock is never released while `run` is still going. One overlap is possible: if the holder's
+session dies server-side, Postgres frees the lock at once, another replica may take it, and the
+old `run` keeps going until the next failed probe, up to the `WithCheck` interval. A dropped
+connection can therefore overlap for up to that interval, so keep `run` idempotent, or short per
+tick. Typical
 use is one goroutine per job:
 
 ```go

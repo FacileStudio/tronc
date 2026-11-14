@@ -64,8 +64,13 @@ func WithOnError(f func(error)) Option {
 
 // Hold blocks until ctx ends. Whenever this replica holds the lock named key
 // it calls run with a context that is cancelled when the lock is lost or ctx
-// ends. run must return soon after its context is cancelled: the lock is only
-// released after run returns, so two replicas never run the job at once.
+// ends. run must return soon after its context is cancelled: Hold itself never
+// releases the lock while run is still going.
+//
+// One overlap is possible. If the holder's session dies server-side, Postgres
+// frees the lock at once, another replica may take it, and the old run keeps
+// going until the next failed probe, up to the WithCheck interval. Keep run
+// idempotent, or short per tick.
 //
 // If the connection holding the lock drops, run's context is cancelled, and
 // Hold goes back to waiting for the lock. If run returns while the lock is
