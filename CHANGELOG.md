@@ -6,6 +6,29 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-14
+
+Rust: tronc-rs follow-up; TS: tronc-ts follow-up.
+
+### Security
+
+- **`mcp` request dedupe matches the OAuth client.** `Request` reuses an open action only when
+  the user, kind, target, digest and the requesting client id all match. Before, a second
+  client of the same person reused the first client's action, so consent given to client B
+  could let client A collect the result (found in Casier, where the result is revealed
+  values). Each client now opens its own action. Go-only in the vectors: no `mcp_*` subject
+  covers confirmations, and the test pins it (`TestRequestReusesOnlyTheSameClientsAction`).
+  Rust: tronc-rs follow-up. TS: tronc-ts follow-up.
+
+### Added
+
+- **`bulle.StatusError.RetryAfter`**: the wait Bulle's `Retry-After` header names, delay
+  seconds or an HTTP date, on a 429 or a 503, capped at a day; zero when it names none or a
+  past date. A 503 with a `Retry-After` now comes back as a `*StatusError` that still wraps
+  `ErrUnreachable`; a 503 without one is unchanged. Vector `bulle_errors.json` gains four
+  cases and a `retry_after_seconds` field, source `@v0.23.1`. Rust: tronc-rs follow-up. TS:
+  tronc-ts follow-up.
+
 ## [0.23.0] - 2026-11-13
 
 Rust: ported in tronc-rs v0.5.0; TS: ported in tronc-ts v0.3.0. Each entry names the port's
@@ -728,7 +751,9 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/FacileStudio/tronc/compare/v0.23.0...v0.23.1
+[0.23.0]: https://github.com/FacileStudio/tronc/compare/v0.22.2...v0.23.0
 [0.22.0]: https://github.com/FacileStudio/tronc/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/FacileStudio/tronc/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/FacileStudio/tronc/compare/v0.19.0...v0.20.0

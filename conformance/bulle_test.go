@@ -9,14 +9,16 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/FacileStudio/tronc/bulle"
 )
 
 type bulleAnswer struct {
-	Status   int    `json:"status"`
-	Body     string `json:"body,omitempty"`
-	Location string `json:"location,omitempty"`
+	Status     int    `json:"status"`
+	Body       string `json:"body,omitempty"`
+	Location   string `json:"location,omitempty"`
+	RetryAfter string `json:"retry_after,omitempty"`
 }
 
 type bulleErrorWant struct {
@@ -27,6 +29,7 @@ type bulleErrorWant struct {
 	UpgradeURL string `json:"upgrade_url,omitempty"`
 	Key        string `json:"key,omitempty"`
 	Limit      int64  `json:"limit,omitempty"`
+	RetryAfter int64  `json:"retry_after_seconds,omitempty"`
 }
 
 // bulleServer answers every request with answer.
@@ -35,6 +38,9 @@ func bulleServer(t *testing.T, answer bulleAnswer) *bulle.Client {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if answer.Location != "" {
 			w.Header().Set("Location", answer.Location)
+		}
+		if answer.RetryAfter != "" {
+			w.Header().Set("Retry-After", answer.RetryAfter)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(answer.Status)
@@ -71,6 +77,10 @@ func bulleErrorVectors(t *testing.T) []vector {
 		{"plain_text_429", bulleAnswer{Status: 429, Body: `Too Many Requests`}},
 		{"server_error_unreachable", bulleAnswer{Status: 500, Body: `{"error":{"code":"internal","message":"boom"}}`}},
 		{"unavailable_unreachable", bulleAnswer{Status: 503, Body: `{"error":{"code":"unavailable","message":"the model did not answer"}}`}},
+		{"daily_cap_retry_after_seconds", bulleAnswer{Status: 429, Body: `{"error":{"code":"rate_limited","message":"at most 200 completions per day"}}`, RetryAfter: "120"}},
+		{"daily_cap_retry_after_past_date", bulleAnswer{Status: 429, Body: `{"error":{"code":"rate_limited","message":"slow down"}}`, RetryAfter: "Wed, 21 Oct 2015 07:28:00 GMT"}},
+		{"daily_cap_retry_after_unreadable", bulleAnswer{Status: 429, Body: `{"error":{"code":"rate_limited","message":"slow down"}}`, RetryAfter: "soon"}},
+		{"unavailable_retry_after", bulleAnswer{Status: 503, Body: `{"error":{"code":"unavailable","message":"the model did not answer"}}`, RetryAfter: "30"}},
 		{"redirect_refused", bulleAnswer{Status: 307, Location: "https://elsewhere.example/api/ai/complete"}},
 		{"ok_unreadable_body", bulleAnswer{Status: 200, Body: `not json`}},
 	}
@@ -91,7 +101,7 @@ func classifyBulle(err error) bulleErrorWant {
 	case stderrors.As(err, &plan):
 		return bulleErrorWant{Kind: "plan_required", Message: plan.Message, UpgradeURL: plan.UpgradeURL, Key: plan.Key, Limit: plan.Limit}
 	case stderrors.As(err, &refused):
-		return bulleErrorWant{Kind: "status", Status: refused.Status, Code: refused.Code, Message: refused.Message}
+		return bulleErrorWant{Kind: "status", Status: refused.Status, Code: refused.Code, Message: refused.Message, RetryAfter: int64(refused.RetryAfter / time.Second)}
 	case stderrors.Is(err, bulle.ErrUnreachable):
 		return bulleErrorWant{Kind: "unreachable"}
 	}

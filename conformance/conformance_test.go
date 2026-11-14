@@ -21,6 +21,7 @@ import (
 const (
 	source  = "github.com/FacileStudio/tronc@871cd90"
 	release = "github.com/FacileStudio/tronc@v0.23.0"
+	patch   = "github.com/FacileStudio/tronc@v0.23.1"
 )
 
 var update = flag.Bool("update", false, "rewrite conformance/vectors from the code")
@@ -55,15 +56,15 @@ var subjects = map[string]func(*testing.T) []vector{
 	"bulle_paths":          bullePathVectors,
 }
 
-// sources names the release that added a subject; the others keep the
-// commit they were first cut from, so their files stay byte-identical.
+// sources names the release that last changed a subject; the others keep
+// the commit they were first cut from, so their files stay byte-identical.
 var sources = map[string]string{
 	"mcp_http":       release,
 	"mcp_rate_limit": release,
 	"mcp_digest":     release,
 	"mcp_state_key":  release,
 	"mcp_failure":    release,
-	"bulle_errors":   release,
+	"bulle_errors":   patch,
 	"bulle_paths":    release,
 }
 

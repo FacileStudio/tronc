@@ -36,10 +36,11 @@ func TestRequestReusesTheOpenAction(t *testing.T) {
 	}
 }
 
-// TestReusedActionKeepsItsFirstClientAndExpiry checks a request that reuses
-// an open action names the time that action has left, not a fresh lifetime,
-// and keeps the client that first asked.
-func TestReusedActionKeepsItsFirstClientAndExpiry(t *testing.T) {
+// TestRequestReusesOnlyTheSameClientsAction checks a request from the
+// client that opened an action reuses it and names the time it has left,
+// while another client of the same person opens its own action, so consent
+// given through one client never reaches another.
+func TestRequestReusesOnlyTheSameClientsAction(t *testing.T) {
 	store := mcptest.NewPending()
 	now := time.Now()
 	if err := store.Create(t.Context(), mcp.Action{
@@ -59,16 +60,31 @@ func TestReusedActionKeepsItsFirstClientAndExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := &sdk.CallToolRequest{
-		Params: &sdk.CallToolParamsRaw{},
-		Extra:  &sdk.RequestExtra{TokenInfo: &auth.TokenInfo{UserID: "u1", Extra: map[string]any{mcp.ExtraClientID: "client-b"}}},
+	ask := func(client string) mcp.Outcome {
+		t.Helper()
+		req := &sdk.CallToolRequest{
+			Params: &sdk.CallToolParamsRaw{},
+			Extra:  &sdk.RequestExtra{TokenInfo: &auth.TokenInfo{UserID: "u1", Extra: map[string]any{mcp.ExtraClientID: client}}},
+		}
+		_, out, err := confirm.Request(t.Context(), req, "delete", "a", "Delete a?")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
 	}
-	_, out, err := confirm.Request(t.Context(), req, "delete", "a", "Delete a?")
-	if err != nil || out.Action.ID != "old" || out.Action.ClientID != "client-a" {
-		t.Fatalf("want the open action of client-a reused, got %+v %v", out.Action, err)
+	same := ask("client-a")
+	if same.Action.ID != "old" || !strings.HasSuffix(same.Message, "stays open for 2 days.") {
+		t.Fatalf("want the open action of client-a reused with the time it has left, got %+v %q", same.Action, same.Message)
 	}
-	if !strings.HasSuffix(out.Message, "stays open for 2 days.") {
-		t.Fatalf("want the time the reused action has left, got %q", out.Message)
+	other := ask("client-b")
+	if other.Action.ID == "old" || other.Action.ClientID != "client-b" {
+		t.Fatalf("want client-b to open its own action, got %+v", other.Action)
+	}
+	if again := ask("client-b"); again.Action.ID != other.Action.ID {
+		t.Fatalf("want client-b's open action reused, got %s and %s", other.Action.ID, again.Action.ID)
+	}
+	if open, _ := confirm.Open(t.Context(), "u1"); len(open) != 2 {
+		t.Fatalf("want one open action per client, got %d", len(open))
 	}
 }
 

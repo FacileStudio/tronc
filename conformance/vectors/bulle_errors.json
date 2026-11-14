@@ -1,5 +1,5 @@
 {
-  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "source": "github.com/FacileStudio/tronc@v0.23.1",
   "subject": "bulle_errors",
   "cases": [
     {
@@ -199,6 +199,64 @@
       },
       "want": {
         "kind": "unreachable"
+      }
+    },
+    {
+      "name": "daily_cap_retry_after_seconds",
+      "input": {
+        "status": 429,
+        "body": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"at most 200 completions per day\"}}",
+        "retry_after": "120"
+      },
+      "want": {
+        "kind": "status",
+        "status": 429,
+        "code": "rate_limited",
+        "message": "at most 200 completions per day",
+        "retry_after_seconds": 120
+      }
+    },
+    {
+      "name": "daily_cap_retry_after_past_date",
+      "input": {
+        "status": 429,
+        "body": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"slow down\"}}",
+        "retry_after": "Wed, 21 Oct 2015 07:28:00 GMT"
+      },
+      "want": {
+        "kind": "status",
+        "status": 429,
+        "code": "rate_limited",
+        "message": "slow down"
+      }
+    },
+    {
+      "name": "daily_cap_retry_after_unreadable",
+      "input": {
+        "status": 429,
+        "body": "{\"error\":{\"code\":\"rate_limited\",\"message\":\"slow down\"}}",
+        "retry_after": "soon"
+      },
+      "want": {
+        "kind": "status",
+        "status": 429,
+        "code": "rate_limited",
+        "message": "slow down"
+      }
+    },
+    {
+      "name": "unavailable_retry_after",
+      "input": {
+        "status": 503,
+        "body": "{\"error\":{\"code\":\"unavailable\",\"message\":\"the model did not answer\"}}",
+        "retry_after": "30"
+      },
+      "want": {
+        "kind": "status",
+        "status": 503,
+        "code": "unavailable",
+        "message": "the model did not answer",
+        "retry_after_seconds": 30
       }
     },
     {

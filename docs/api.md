@@ -624,8 +624,10 @@ practice (audience `bulle`, scopes `bulle.read` and `bulle.write`).
   as `ErrUnreachable`. It works on a copy of `Config.HTTPClient`.
 - Errors: a 402 is `*PlanRequired{Message, UpgradeURL, Key, Limit}`, read from a bare body or
   from the `{"error":{...}}` envelope (an unsafe `upgrade_url` is dropped). Any other 4xx is
-  `*StatusError{Status, Code, Message}`. A 3xx, a 5xx, a timeout or a network error wraps
-  `ErrUnreachable`. `conformance/vectors/bulle_errors.json` and `bulle_paths.json` pin the
+  `*StatusError{Status, Code, Message, RetryAfter}`; on a 429 `RetryAfter` is the wait the
+  `Retry-After` header names (seconds or an HTTP date, capped at a day, zero when absent). A
+  503 with a `Retry-After` is a `*StatusError` too, and still wraps `ErrUnreachable`. Any other
+  3xx, 5xx, timeout or network error wraps `ErrUnreachable`. `conformance/vectors/bulle_errors.json` and `bulle_paths.json` pin the
   mapping and the escaping.
 - `RunStatus` adds `State` (`running`, `needs_approval`, `done`, `failed`) and `ContinueURL`, clears
   output URLs that are not http or https, and never carries Bulle's `decide_path`.
@@ -721,7 +723,9 @@ rate limit.
   `Outcome.Message` the standard "Nothing happened yet…" text (`Waiting()`). A declined `Resume`
   carries `MessageDeclined`. Put `status`, `confirm_url` and `message` in the tool's output:
   mcptest reads the first two. `Request` asks about the person's open action of the same kind,
-  target and digest instead of opening a second one, so an agent that loops opens one action. `Kind.Fingerprint`
+  target and digest, asked by the same OAuth client, instead of opening a second one, so an
+  agent that loops opens one action. Another client of the same person opens its own action,
+  so consent given through one client never reaches another. `Kind.Fingerprint`
   must change whenever the target changes, so a confirmation never runs on content the person
   did not see. The app's confirm page lists `Open`, shows `State`, and calls `Confirm` or
   `Dismiss`; it must refuse a delegated token, because an agent never confirms its own request.
