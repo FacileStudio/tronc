@@ -6,6 +6,14 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **`joblock` package.** `joblock.Hold(ctx, db, key, run)` takes a Postgres session advisory
+  lock on a dedicated connection, retries every few seconds until it holds it, runs `run` while
+  held, and releases when `ctx` ends or the connection drops. Replicas of one app call it with
+  the same key so a background loop runs on one of them only. Options: `WithRetry`,
+  `WithCheck`, `WithOnError`.
+
 ## [0.23.2] - 2026-11-14
 
 Rust: tronc-rs follow-up; TS: tronc-ts follow-up.

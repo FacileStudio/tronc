@@ -1,6 +1,6 @@
 # tronc — API
 
-The complete exported surface, package by package. Ten packages importable under
+The complete exported surface, package by package. Packages importable under
 `github.com/FacileStudio/tronc/<package>`, plus `migrate`, which shares the path but is a
 separate module with its own `go.mod` and tags. Behavior and rationale live in
 [architecture.md](architecture.md); this page is the reference.
@@ -799,6 +799,42 @@ privately, every tool's prefix, title, hints and object schemas, the 403 `insuff
 challenge on a write tool with a read-only token, and for each `ConfirmCase`: a link and no run
 without elicitation and for a 2025-11-25 client, no run on decline, exactly one run on accept,
 no second run on replay, and no run for a link id passed off as a signed state.
+
+## `joblock`
+
+One replica runs a background job at a time. Every replica calls `Hold` with the same key; one
+takes a Postgres session advisory lock (`pg_try_advisory_lock(hashtextextended('joblock:'||key, 0))`)
+on a dedicated connection, and the others retry until it is free.
+
+```go
+const (
+	DefaultRetry = 5 * time.Second
+	DefaultCheck = 5 * time.Second
+)
+
+func Hold(ctx context.Context, db *sql.DB, key string, run func(context.Context), opts ...Option) error
+
+func WithRetry(d time.Duration) Option      // wait between lock attempts
+func WithCheck(d time.Duration) Option      // how often the holder probes its connection
+func WithOnError(f func(error)) Option      // failed attempt or lost connection
+```
+
+`Hold` blocks until `ctx` ends. While this replica holds the lock it calls `run` with a context
+that is cancelled when the lock is lost or `ctx` ends. `run` must return soon after that: the
+lock is released only after `run` returns, so two replicas never run the job at once. Typical
+use is one goroutine per job:
+
+```go
+go joblock.Hold(ctx, sqlDB, "reminders", func(ctx context.Context) { reminders.Loop(ctx) })
+```
+
+If the connection drops (database restart, network, `pg_terminate_backend`), the probe fails
+within `WithCheck`, `run`'s context is cancelled, and `Hold` waits for the lock again. If `run`
+returns by itself the lock is released and `Hold` returns nil. `Hold` returns nil when `ctx`
+ends and an error only for a nil `db` or `run` or an empty `key`. The held lock pins one
+connection of `db`, so the pool must allow more than one. The lock is a session lock, so a
+transaction-mode pooler (PgBouncer) breaks it.
+Keys are namespaced with `joblock:`, so they never collide with `migrate`'s lock id.
 
 ## `migrate`
 
