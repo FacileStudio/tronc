@@ -6,6 +6,23 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-11-14
+
+Rust: tronc-rs follow-up; TS: tronc-ts follow-up.
+
+### Changed
+
+- **`mcp.Failure` plan-limit text says nothing was done and names the feature readably.** A
+  `PlanLimit` now reads "Nothing was done: the plan limit for storage is reached. Upgrade at
+  <url>" instead of "The plan limit for nuage.storage_gb is reached. Upgrade at <url>", so a
+  model no longer tells the user a refused write partly happened, and no longer shows an
+  internal key. A small table maps the suite's forfait keys (`ai.access`, `courrier.mailboxes`,
+  `echo.max_call_minutes`, `echo.max_participants`, `echo.recording`, `nuage.storage_gb`,
+  `sonar.searches_daily`); any other key stays as is. The upgrade link still goes through
+  `errors.SafeUpgradeURL`. `payment_required` text is unchanged. Vector `mcp_failure.json`
+  gains `plan_limit_known_key_readable` and `plan_limit_unknown_key_raw`, source `@v0.23.2`.
+  Rust: tronc-rs follow-up (text and table). TS: tronc-ts follow-up (text and table).
+
 ## [0.23.1] - 2026-11-14
 
 Rust: tronc-rs follow-up; TS: tronc-ts follow-up.
@@ -751,7 +768,8 @@ Relative to the copies this replaces:
   floor across the suite.
 - The only dependency is `github.com/go-chi/chi/v5`.
 
-[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/FacileStudio/tronc/compare/v0.23.2...HEAD
+[0.23.2]: https://github.com/FacileStudio/tronc/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/FacileStudio/tronc/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/FacileStudio/tronc/compare/v0.22.2...v0.23.0
 [0.22.0]: https://github.com/FacileStudio/tronc/compare/v0.21.0...v0.22.0

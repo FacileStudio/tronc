@@ -1,5 +1,5 @@
 {
-  "source": "github.com/FacileStudio/tronc@v0.23.0",
+  "source": "github.com/FacileStudio/tronc@v0.23.2",
   "subject": "mcp_failure",
   "cases": [
     {
@@ -211,7 +211,7 @@
         "plan_limit_feature": "rooms"
       },
       "want": {
-        "text": "The plan limit for rooms is reached. Upgrade at https://sso.example/spaces/7"
+        "text": "Nothing was done: the plan limit for rooms is reached. Upgrade at https://sso.example/spaces/7"
       }
     },
     {
@@ -221,7 +221,28 @@
         "plan_limit_feature": "storage"
       },
       "want": {
-        "text": "The plan limit for storage is reached."
+        "text": "Nothing was done: the plan limit for storage is reached."
+      }
+    },
+    {
+      "name": "plan_limit_known_key_readable",
+      "input": {
+        "upgrade_url": "https://sso.example/spaces/7",
+        "hint": "",
+        "plan_limit_feature": "nuage.storage_gb"
+      },
+      "want": {
+        "text": "Nothing was done: the plan limit for storage is reached. Upgrade at https://sso.example/spaces/7"
+      }
+    },
+    {
+      "name": "plan_limit_unknown_key_raw",
+      "input": {
+        "hint": "",
+        "plan_limit_feature": "plume.notes"
+      },
+      "want": {
+        "text": "Nothing was done: the plan limit for plume.notes is reached."
       }
     },
     {
@@ -232,7 +253,7 @@
         "plan_limit_feature": "rooms"
       },
       "want": {
-        "text": "The plan limit for rooms is reached."
+        "text": "Nothing was done: the plan limit for rooms is reached."
       }
     }
   ]

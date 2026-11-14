@@ -713,8 +713,10 @@ rate limit.
   `Idempotent`; one that asks for a confirmation, sends or creates on each call is not.
 - **Errors.** Return `Failure(err, hint)` from a tool: a `not_found` keeps its message plus the
   hint (name the tool that lists valid ids), a bad argument or an `unavailable` keeps its
-  message, a `payment_required` or a `PlanLimit` (porte's `forfait.LimitError` once it has the
-  method) names the upgrade page when it is safe to show, and anything else becomes
+  message, a `payment_required` keeps its message, a `PlanLimit` (porte's `forfait.LimitError`)
+  becomes "Nothing was done: the plan limit for <feature> is reached." with a readable feature
+  name (`nuage.storage_gb` reads "storage"; an unknown key stays as is), both name the upgrade
+  page when it is safe to show, and anything else becomes
   `ErrUnavailable`. The first letter is capitalised as a rune, so "échec" becomes "Échec".
   `conformance/vectors/mcp_failure.json` pins every case.
 - **Confirmations.** A sensitive tool calls `Resume` when `Retrying(req)`, else `Request`.
