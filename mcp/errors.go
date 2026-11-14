@@ -25,11 +25,11 @@ type PlanLimit interface {
 // for a bad argument or a missing precondition keeps its message. A missing
 // record keeps its message plus hint, which should name the tool that lists
 // valid ids. A tronc payment_required keeps its message and a PlanLimit says
-// nothing was done and names the feature; both name the upgrade page, so the model can tell the user
-// where to go. An unavailable dependency keeps its message, which says what
-// is down. Anything else becomes ErrUnavailable, so internal detail stays
-// out of the result. A nil err stays nil. Tools return the value as their
-// error, and the SDK sends it as an isError result.
+// nothing was done and names the feature; both name the upgrade page, so the
+// model can tell the user where to go. An unavailable dependency keeps its
+// message, which says what is down. Anything else becomes ErrUnavailable, so
+// internal detail stays out of the result. A nil err stays nil. Tools return
+// the value as their error, and the SDK sends it as an isError result.
 func Failure(err error, hint string) error {
 	if err == nil {
 		return nil
