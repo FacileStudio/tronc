@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-14
+
 ### Added
 
 - **`joblock` package.** `joblock.Hold(ctx, db, key, run)` takes a Postgres session advisory
