@@ -55,9 +55,11 @@ type Question struct {
 	Options      []string `json:"options,omitempty"`
 }
 
-// DecideRequest asks Questions about State for the Bulle user whose email
-// is ActingFor.
+// DecideRequest asks Questions about State for the user the client's
+// TokenSource speaks for.
 type DecideRequest struct {
+	// Deprecated: leave ActingFor empty and call with the user's exchanged
+	// token. Set, it names the user a service-key call acts for.
 	ActingFor string              `json:"-"`
 	State     any                 `json:"state"`
 	Questions map[string]Question `json:"questions"`
@@ -87,11 +89,9 @@ type Decision struct {
 
 // DecideAI asks Bulle's POST /api/ai/decide as the user the TokenSource
 // speaks for, with an exchanged token. A user without AI access gets
-// *PlanRequired; a 429 is a *StatusError.
-//
-// Deprecated: a non-empty ActingFor runs as the app's service instead: the
-// TokenSource returns the service key Bulle knows the app by, and ActingFor
-// names the user, whose plan Bulle checks. Leave ActingFor empty.
+// *PlanRequired; a 429 is a *StatusError. A request that sets the deprecated
+// ActingFor runs as the app's service instead, with the service key Bulle
+// knows the app by as the TokenSource.
 func (c *Client) DecideAI(ctx context.Context, req DecideRequest) (Decision, error) {
 	call := Request{Method: http.MethodPost, Segments: []string{"ai", "decide"}, Body: req}
 	if actingFor := strings.TrimSpace(req.ActingFor); actingFor != "" {
