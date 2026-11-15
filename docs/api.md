@@ -613,10 +613,13 @@ practice (audience `bulle`, scopes `bulle.read` and `bulle.write`).
   Registre space the request is for, whose plan may grant AI; leave it empty for the personal
   scope. Bulle caps the call (system 4 KiB, prompt 8 KiB, input 64 KiB, 4096 tokens) and the user
   (200 a day, then a 429). Give this client a longer timeout, such as 90 s.
-- `DecideAI(ctx, DecideRequest{ActingFor, State, Questions})` calls `POST /api/ai/decide` as the
-  app's service: the `TokenSource` returns the service key Bulle knows the app by, and
-  `ActingFor` is the user's email, sent as `X-Bulle-Acting-For`. An empty `ActingFor` is
-  `ErrNoActingFor` and sends nothing. It returns `Decision{Answers, Model, Usage}`.
+- `DecideAI(ctx, DecideRequest{State, Questions})` calls `POST /api/ai/decide` as the user, like
+  `Complete`, and returns `Decision{Answers, Model, Usage}`. The deprecated `ActingFor` field runs
+  as the app's service instead: the `TokenSource` returns the service key and `ActingFor` is the
+  user's email, sent as `X-Bulle-Acting-For`.
+- `Summarize(ctx, SummarizeRequest{Query, Sources})` calls `POST /api/ai/summarize` as the user with
+  1 to 10 `SummarySource{Title, URL, Snippet}` and a query of up to 500 bytes. It returns
+  `Summary{Summary, Citations, Model}`.
 - `Call(ctx, Request{Method, Segments, Query, Body, Header}, out)` for any other route. Each
   segment is escaped on its own; an empty, `.` or `..` segment is `ErrBadSegment` and sends
   nothing. `Header` adds headers and never replaces `Authorization`.

@@ -37,7 +37,7 @@ func TestCompleteOmitsAnEmptySpace(t *testing.T) {
 	}
 }
 
-func TestDecideActsForTheUser(t *testing.T) {
+func TestDecideAIActsForTheUser(t *testing.T) {
 	var actingFor string
 	f := newFakeBulle(t, func(w http.ResponseWriter, r *http.Request) {
 		actingFor = r.Header.Get(bulle.ActingForHeader)
@@ -60,9 +60,58 @@ func TestDecideActsForTheUser(t *testing.T) {
 	if decision.Answers["project"].Choice != "a" || decision.Usage.InputTokens != 3 {
 		t.Fatalf("decision = %+v", decision)
 	}
-	req.ActingFor = " "
-	if _, err := client.DecideAI(context.Background(), req); !errors.Is(err, bulle.ErrNoActingFor) || f.seen().Requests != 1 {
-		t.Fatalf("a missing user must send nothing, err = %v", err)
+}
+
+func TestDecideAIRunsAsTheUserWithoutActingFor(t *testing.T) {
+	var actingFor string
+	f := newFakeBulle(t, func(w http.ResponseWriter, r *http.Request) {
+		actingFor = r.Header.Get(bulle.ActingForHeader)
+		writeJSON(w, 200, `{"answers":{"project":{"choice":"b","confidence":0.8,"probabilities":{"b":0.8}}},"model":"jev","usage":{"input_tokens":3,"output_tokens":1}}`)
+	})
+	decision, err := newClient(t, f).DecideAI(context.Background(), bulle.DecideRequest{
+		ActingFor: " ", State: map[string]string{"title": "x"},
+		Questions: map[string]bulle.Question{"project": {Type: "choice", Instructions: "Pick", Options: []string{"a", "b"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := f.seen()
+	if got.Method != "POST" || got.RawPath != "/api/ai/decide" || got.Auth != "Bearer tok" || actingFor != "" {
+		t.Fatalf("request = %+v acting for %q", got, actingFor)
+	}
+	if decision.Answers["project"].Choice != "b" {
+		t.Fatalf("decision = %+v", decision)
+	}
+}
+
+func TestDecideAIWithoutAIAccessIsPlanRequired(t *testing.T) {
+	f := newFakeBulle(t, fixed(402, `{"error":{"code":"payment_required","message":"No AI","upgrade_url":"https://sso.example/spaces","key":"ai.access"}}`))
+	_, err := newClient(t, f).DecideAI(context.Background(), bulle.DecideRequest{})
+	var plan *bulle.PlanRequired
+	if !errors.As(err, &plan) {
+		t.Fatalf("err = %v, want *PlanRequired", err)
+	}
+}
+
+func TestSummarizeRunsAsTheUser(t *testing.T) {
+	var actingFor string
+	f := newFakeBulle(t, func(w http.ResponseWriter, r *http.Request) {
+		actingFor = r.Header.Get(bulle.ActingForHeader)
+		writeJSON(w, 200, `{"summary":"It rains.","citations":[0],"model":"m1"}`)
+	})
+	out, err := newClient(t, f).Summarize(context.Background(), bulle.SummarizeRequest{
+		Query: "weather", Sources: []bulle.SummarySource{{Title: "T", URL: "https://x.test", Snippet: "rain"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := f.seen()
+	want := `{"query":"weather","sources":[{"title":"T","url":"https://x.test","snippet":"rain"}]}`
+	if got.Method != "POST" || got.RawPath != "/api/ai/summarize" || got.Body != want || got.Auth != "Bearer tok" || actingFor != "" {
+		t.Fatalf("request = %+v acting for %q", got, actingFor)
+	}
+	if out.Summary != "It rains." || len(out.Citations) != 1 || out.Citations[0] != 0 || out.Model != "m1" {
+		t.Fatalf("summary = %+v", out)
 	}
 }
 
