@@ -6,6 +6,33 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-16
+
+### Added
+
+- **`httpx.Serve(ctx, handler, ServeConfig)`.** The `http.Server` and graceful-shutdown block every
+  backend wrote by hand, with safe defaults (read header 5 s, read 30 s, write 60 s, idle 120 s,
+  15 s shutdown grace), each overridable, and a negative value for no limit. Streaming and
+  large-transfer apps set `WriteTimeout: -1`. `OnShutdown` hooks end SSE and WebSocket streams
+  before the grace period. It never wraps the `ResponseWriter`.
+- **`httpx.WriteBudget(d)`.** Middleware that gives one route its own write deadline, replacing a
+  per-app `extendWriteDeadline`.
+- **`middleware.FixedWindow`.** A fixed-window limiter with `MaxKeys` and the suite envelope on
+  refusal, for clients that depend on the window shape (Agenda and Courrier CalDAV). Perception's
+  token bucket was already covered by `Ratelimit`; `docs/ratelimit.md` has the recipes.
+- **`middleware.Gzip`.** Response compression for clients that accept gzip, skipping encoded,
+  non-text, event-stream, Range, Upgrade, HEAD, 204 and 304 responses, and keeping `Flush` working.
+- **`health.Version(version)`.** The `{"version": ...}` handler eight apps copied.
+- **`netguard`.** One audited SSRF guard: `IsInternal`, `CheckURL`, `CheckHost`, the dialer `Control`
+  hook, and a `Guard` whose `DialContext` connects to the address it checked. Built from the
+  Registre and sonar copies, which differed only in a comment, plus the Azure wireserver address
+  and `5f00::/16`.
+
+### Changed
+
+- `testdb/v0.2.0` ships alongside: `AssertModelsMatch`, `OpenIsolated`, `LockID`, `URLFrom`,
+  `Config.SearchPathTail`. See `testdb/CHANGELOG.md`.
+
 ## [0.25.0] - 2026-11-15
 
 ### Added
