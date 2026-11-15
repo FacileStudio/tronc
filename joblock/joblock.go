@@ -102,8 +102,10 @@ func Hold(ctx context.Context, db *sql.DB, key string, run func(context.Context)
 		if hold(ctx, conn, name, run, c) {
 			return nil
 		}
-		if ctx.Err() != nil {
+		select {
+		case <-ctx.Done():
 			return nil
+		default:
 		}
 	}
 }
