@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -70,5 +71,16 @@ func TestReadyBoundsSlowChecks(t *testing.T) {
 
 	if code, _ := status(t, router, "/ready"); code != http.StatusServiceUnavailable {
 		t.Errorf("a hanging check produced %d, want 503", code)
+	}
+}
+
+func TestVersionAnswersTheReleaseUncached(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	Version("v1.2.3")(recorder, httptest.NewRequest(http.MethodGet, "/version", nil))
+	if recorder.Code != http.StatusOK || strings.TrimSpace(recorder.Body.String()) != `{"version":"v1.2.3"}` {
+		t.Fatalf("got %d %q", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("a version answer must not be cached across a deploy")
 	}
 }

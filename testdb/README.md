@@ -51,9 +51,41 @@ with `t.Skip(testdb.SkipReason("sh scripts/postgres-up.sh"))` when `testDB` is n
 | `URL() (string, bool)` | reads `TEST_DATABASE_URL`; false means skip |
 | `Open(url, Config)` | creates this binary's schema, connects scoped to it, migrates |
 | `Truncate(db, Config)` | empties every table **except the migration ledger** |
-| `SchemaName(prefix)` | the schema this binary owns — derive a goose `LockID` from it |
+| `SchemaName(prefix)` | the schema this binary owns |
+| `LockID(db)` | a goose `LockID` derived from the schema `db` is scoped to |
+| `OpenIsolated(t, url, cfg)` | a schema of its own for one test, dropped at cleanup |
+| `URLFrom(name)` | `URL` for an app that reads its own variable |
+| `AssertModelsMatch(t, db, models...)` | every GORM model column exists in the migrated schema, with a compatible type |
 | `Announce(bootstrap)` | the loud skip banner, on stderr |
 | `SkipReason(bootstrap)` | the message for `t.Skip` |
+
+## Model and schema drift
+
+One test replaces each app's `schemas/columns_test.go`:
+
+```go
+func TestModelsMatchTheMigratedSchema(t *testing.T) {
+	testdb.AssertModelsMatch(t, requireDB(t), &User{}, &Space{}, &Document{})
+}
+```
+
+A column a model names but the migrations never created, or a column whose type the field cannot
+hold, fails with the table, the column and the types it would have accepted. A model with a custom
+column type passes `AssertModelsMatchWith(t, db, testdb.MatchOptions{Extra: ...}, models...)`.
+
+## Why some apps did not use it, and what changed
+
+Five apps hand-rolled their harness. The reasons were missing features, now here:
+
+| App | What it needed | Now |
+|---|---|---|
+| Echo, Journal | its own env var, a fresh schema per test | `URLFrom`, `OpenIsolated` |
+| Antenne, Place | a fresh schema per test, `public` on the search path | `OpenIsolated`, `Config.SearchPathTail` |
+| Casier, Journal, Sablier | a per-schema goose lock id | `LockID` |
+| Sablier | one migration per package, then empty tables between tests | `Open` once, `Truncate` between tests |
+
+Nuage's `tests/helpers_test.go` drops and recreates the `public` schema, which no per-binary
+schema design supports; it should move to `Open` and `Truncate`.
 
 ## The parts that are load-bearing
 
@@ -76,8 +108,9 @@ with `t.Skip(testdb.SkipReason("sh scripts/postgres-up.sh"))` when `testDB` is n
   schema name is deterministic on purpose — it makes schemas reusable — but it means an IDE test
   run racing a pre-push hook will misbehave.
 - `t.Parallel()` within a package is not supported: `Truncate` is global to the schema.
-- goose's advisory lock is scoped to the **database**, not the schema. Pass a `LockID` derived
-  from `SchemaName` or every test package queues on the same default.
+- goose's advisory lock is scoped to the **database**, not the schema. Pass `LockID(db)` or every
+  test package queues on the same default.
+- `OpenIsolated` migrates once per test. Use `Open` and `Truncate` unless a test needs its own schema.
 
 ---
 
