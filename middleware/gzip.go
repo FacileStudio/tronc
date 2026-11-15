@@ -89,7 +89,7 @@ func (g *gzipResponseWriter) decide(status int, first []byte) {
 	}
 	header.Set("Content-Encoding", "gzip")
 	header.Del("Content-Length")
-	g.gz = gzipPool.Get().(*gzip.Writer)
+	g.gz, _ = gzipPool.Get().(*gzip.Writer)
 	g.gz.Reset(g.ResponseWriter)
 }
 

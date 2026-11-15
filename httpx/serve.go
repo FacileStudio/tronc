@@ -69,7 +69,7 @@ func Serve(ctx context.Context, handler http.Handler, cfg ServeConfig) error {
 		logger = slog.Default()
 	}
 	server := newServer(handler, cfg)
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	for _, hook := range cfg.OnShutdown {
 		server.RegisterOnShutdown(hook)
 	}
