@@ -64,11 +64,22 @@ type Config struct {
 
 	// Keep lists tables Truncate must not empty, on top of LedgerTable.
 	Keep []string
+
+	// SearchPathTail names schemas searched after the test schema, usually
+	// "public" for an app whose migrations rely on an extension (pg_trgm,
+	// unaccent, vector) installed there.
+	SearchPathTail []string
 }
 
 // URL returns the configured connection string, or false when tests should skip.
 func URL() (string, bool) {
-	value := strings.TrimSpace(os.Getenv(EnvVar))
+	return URLFrom(EnvVar)
+}
+
+// URLFrom is URL for an app that reads a variable of its own, such as
+// ECHO_TEST_DATABASE_URL, so its CI keeps working while it adopts testdb.
+func URLFrom(name string) (string, bool) {
+	value := strings.TrimSpace(os.Getenv(name))
 	return value, value != ""
 }
 
@@ -103,16 +114,7 @@ Point them at a scratch database:
 // sharing one test database otherwise queues on the same default id.
 func SchemaName(prefix string) string {
 	base := strings.TrimSuffix(filepath.Base(os.Args[0]), ".test")
-	safe := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r + 32
-		default:
-			return '_'
-		}
-	}, base)
+	safe := sanitize(base)
 	if safe == "" {
 		safe = "anonymous"
 	}
@@ -128,34 +130,7 @@ func Open(url string, cfg Config) (*gorm.DB, error) {
 	if cfg.Prefix == "" {
 		return nil, fmt.Errorf("testdb: Prefix is required")
 	}
-	if cfg.Migrate == nil {
-		return nil, fmt.Errorf("testdb: Migrate is required")
-	}
-	open := cfg.Open
-	if open == nil {
-		open = defaultOpen
-	}
-	schema := SchemaName(cfg.Prefix)
-
-	admin, err := open(withTimeout(url))
-	if err != nil {
-		return nil, fmt.Errorf("testdb: open %s: %w", EnvVar, err)
-	}
-	if err := admin.Exec(`CREATE SCHEMA IF NOT EXISTS "` + schema + `"`).Error; err != nil {
-		return nil, fmt.Errorf("testdb: create schema %s: %w", schema, err)
-	}
-	if handle, err := admin.DB(); err == nil {
-		_ = handle.Close()
-	}
-
-	scoped, err := open(withSearchPath(withTimeout(url), schema))
-	if err != nil {
-		return nil, fmt.Errorf("testdb: open %s scoped to %s: %w", EnvVar, schema, err)
-	}
-	if err := cfg.Migrate(scoped); err != nil {
-		return nil, fmt.Errorf("testdb: migrate %s: %w", schema, err)
-	}
-	return scoped, nil
+	return openSchema(url, cfg, SchemaName(cfg.Prefix))
 }
 
 // Truncate empties every table in the current schema and restarts the identity

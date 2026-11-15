@@ -133,9 +133,10 @@ Full reference, including the six fallback names for the origin list and the tra
 errors/       the error envelope and its code-to-status map
 httpjson/     bounded, strict JSON decoding; WriteJSON and WriteError
 logger/       slog JSON on stdout, with a Wrap seam for log shipping
-middleware/   RequestLogger, CORS, Recoverer, SecurityHeaders
-httpx/        NewRouter and Chain — the standard middleware stack
-health/       /health and /ready, mounted at the root and under /api
+middleware/   RequestLogger, CORS, Recoverer, SecurityHeaders, Ratelimit, FixedWindow, Gzip
+httpx/        NewRouter and Chain — the standard middleware stack; Serve with graceful shutdown
+health/       /health and /ready, mounted at the root and under /api; Version
+netguard/     SSRF guard: internal-range checks and a dialer that cannot be rebound
 healthcheck/  an argv hook so a distroless container can probe itself
 spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers

@@ -8,6 +8,29 @@ semver — while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-16
+
+### Added
+
+- **`AssertModelsMatch(t, db, models...)`** and `AssertModelsMatchWith(t, db, MatchOptions, models...)`.
+  Fail when a GORM model reads or writes a column the migrated schema lacks, or holds one in a
+  type the Go field cannot carry. It replaces the near-identical `schemas/columns_test.go` that 13
+  apps carry, where only the model list differs. Types come from the field's `gorm:"type:"` tag
+  first, then its Go type (int sizes, float, string or uuid, time, bytea, `[16]byte` as uuid, a
+  serializer or slice as jsonb), so the per-app `compatibleTypes` variants all fit; `Extra` adds
+  accepted types for a custom column. `AllowedTypes(field)` is exported for apps that keep their
+  own loop.
+- **`OpenIsolated(t, url, cfg)`**: a schema of its own per test, migrated and dropped by
+  `t.Cleanup`. For tests that call `t.Parallel`, or that must start from a schema they migrate
+  themselves (Echo, Journal, Antenne and Place hand-rolled this).
+- **`LockID(db)`**: a goose advisory-lock id derived from the schema `db` is scoped to, so test
+  packages migrating at once stop queuing on goose's default id (Casier, Journal, Sablier
+  hand-rolled this).
+- **`URLFrom(name)`**: `URL` for an app whose CI sets its own variable, such as
+  `ECHO_TEST_DATABASE_URL`.
+- **`Config.SearchPathTail`**: schemas searched after the test schema, usually `public`, for
+  migrations that rely on an extension (pg_trgm, unaccent, vector) installed there (Place).
+
 ## [0.1.1] — 2026-08-06
 
 ### Fixed

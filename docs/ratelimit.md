@@ -268,6 +268,30 @@ return a header the client wrote, so a caller can mint a fresh key per request. 
 every twelve seconds instead of blocking for a minute. The login throttle stays app-side, see below, so
 `internal/ratelimit` keeps its file for that one caller.
 
+### Agenda and Courrier: `internal/middleware/ratelimit.go` (fixed window)
+
+Both keep a fixed window on purpose: CalDAV clients already see its exact shape, the full budget
+at once and then refusals until the window ends. `middleware.FixedWindow` is that limiter, so
+delete the file. Agenda, in `modules/caldav/handler.go`:
+
+```go
+rateLimiter := troncmiddleware.FixedWindow(troncmiddleware.FixedWindowConfig{
+	Requests: 100, Window: time.Minute, MaxKeys: 50000,
+})
+```
+
+Courrier's `RateLimitBy(requests, window, key)` becomes the same config with `KeyFunc: key`; an
+empty key still falls back to the remote address. The refusal is the suite envelope (`rate_limited`,
+429) with a `Retry-After` counting down to the window end, as before. Both copies keep one goroutine
+per limiter to sweep; `FixedWindow` starts none. `MaxKeys` is new: the copies grew with every
+address.
+
+### Perception: the Perception recipe above also covers it
+
+Nothing changes in the recipe: `Ratelimit` with `Limit: ingestPerMinute / 60`, `Burst:
+ingestPerMinute`, `MaxKeys: 50000` and an `OnRefuse` that writes `errors.RateLimited`. Its copy
+sent a fixed `Retry-After: 60`; the replacement sends the computed wait.
+
 ## Stays app-side
 
 - **Antenne login throttle** (`modules/auth/router.go`, `ThrottleLogins`). It counts failed
@@ -278,7 +302,8 @@ every twelve seconds instead of blocking for a minute. The login throttle stays 
   and never a `ClientIP` helper. Today it uses `authcontext.ClientIP`, which trusts the leftmost
   `X-Forwarded-For`, so the five-failure limit can be bypassed by sending a new header with each
   guess.
-- **Echo request limiter** (`internal/middleware/ratelimit.go`). It picks the budget from the
+- **Echo request limiter** (`internal/middleware/ratelimit.go`), re-checked against tronc v0.26.0 and
+  still app-side. It picks the budget from the
   caller's identity (guest or member), spends an IPv6 caller's /64 and /48 buckets together
   with the /48 at four times the budget, takes the rate per call in `AllowKey`, and resolves the
   visitor through Cloudflare itself. It already runs a bounded LRU over `x/time/rate`. tronc
