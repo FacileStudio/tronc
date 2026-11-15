@@ -6,6 +6,29 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-15
+
+### Added
+
+- **`bulle.Client.Summarize`.** `Summarize(ctx, SummarizeRequest{Query, Sources []SummarySource})`
+  calls Bulle's `POST /api/ai/summarize` as the user the TokenSource speaks for (an exchanged
+  token) and returns a `Summary` (summary, citations, model).
+
+### Changed
+
+- **`bulle.Client.DecideAI` runs as the user.** With `ActingFor` empty it calls
+  `POST /api/ai/decide` with the user's exchanged token and sends no `X-Bulle-Acting-For`.
+  Setting `ActingFor` keeps the old service-key call and is deprecated, as is `ActingForHeader`.
+
+### Removed
+
+- **`bulle.ErrNoActingFor`** (breaking). An empty `ActingFor` is now the normal call.
+
+### Fixed
+
+- **`joblock.Hold`** checks for a cancelled context with a `select` on `ctx.Done()`, so the
+  lint pass no longer flags `nilerr`. Behaviour is unchanged: it still returns nil when `ctx` ends.
+
 ## [0.24.0] - 2026-11-14
 
 ### Added
