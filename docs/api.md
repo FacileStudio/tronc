@@ -352,6 +352,39 @@ A token bucket per key, refilled continuously, with no goroutine. A refusal alwa
 inside a handler or outside any request. Not in `httpx.NewRouter`'s chain: mount it on the
 routes that need it. Per-app replacement configs are in [ratelimit.md](ratelimit.md).
 
+### Fixed-window limiting
+
+```go
+type FixedWindowConfig struct {
+	Requests int                                      // per window; <= 0 means DefaultRatelimitLimit (10)
+	Window   time.Duration                            // <= 0 means one minute
+	KeyFunc  func(*http.Request) string               // nil or "" means the host of RemoteAddr
+	MaxKeys  int                                      // 0 keeps every live key; > 0 starts over when full
+	OnRefuse func(http.ResponseWriter, *http.Request) // nil writes 429 with the suite envelope, rate_limited
+}
+
+func FixedWindow(cfg FixedWindowConfig) func(http.Handler) http.Handler
+```
+
+The full budget at once, then refusals until the window ends, with `Retry-After` counting down to
+that end. Use it where clients depend on that shape (CalDAV and other sync clients); otherwise
+prefer `Ratelimit`, whose token bucket never admits twice the budget across a window boundary.
+No goroutine: expired windows are dropped during requests.
+
+### Gzip
+
+```go
+func Gzip(next http.Handler) http.Handler
+```
+
+Compresses text, JSON, XML, JavaScript and SVG responses for clients that send
+`Accept-Encoding: gzip` (a `q=0` refuses it). It leaves a response alone when the handler already
+set `Content-Encoding`, for HEAD, 1xx, 204 and 304, for types that are not compressible (images,
+archives, `text/event-stream`), and for Range and Upgrade requests, so downloads, SSE and
+WebSocket routes pass through. It sets `Vary: Accept-Encoding`, drops a stale `Content-Length`,
+and keeps `Flush` and `http.ResponseController` working. Mount it on the API routes, not on a
+file-download subtree.
+
 ### Recovery
 
 ```go
@@ -380,6 +413,51 @@ outermost first. `Security.Trusted` defaults to the router's trusted proxies.
 `NewRouter` returns a chi router to build on; `Chain` wraps any `http.Handler`, for an app that
 routes with something other than chi.
 
+### Serving
+
+```go
+type ServeConfig struct {
+	Addr, Listener, Logger
+	ReadHeaderTimeout, ReadTimeout, WriteTimeout, IdleTimeout, ShutdownGrace time.Duration
+	MaxHeaderBytes int
+	OnShutdown     []func()
+}
+
+func Serve(ctx context.Context, handler http.Handler, cfg ServeConfig) error
+func WriteBudget(budget time.Duration) func(http.Handler) http.Handler
+```
+
+`Serve` is the `http.Server` plus signal-driven graceful shutdown every backend wrote by hand.
+It runs until `ctx` ends (pass `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)`), then
+drains in-flight requests for `ShutdownGrace` and closes what is left. It returns nil after a clean
+stop, the listen error if the port cannot be bound, and an error if the grace period ran out.
+
+| Field | Zero value | Negative value |
+|---|---|---|
+| `ReadHeaderTimeout` | 5 s | none |
+| `ReadTimeout` | 30 s | none |
+| `WriteTimeout` | 60 s | none |
+| `IdleTimeout` | 120 s | none |
+| `ShutdownGrace` | 15 s | not allowed to wait: closes at once |
+
+`MaxHeaderBytes` zero keeps net/http's 1 MiB. `OnShutdown` hooks run when shutdown begins, so an
+app can end its SSE streams or WebSockets (net/http neither waits for nor closes hijacked
+connections, and a held stream otherwise burns the whole grace period).
+
+Serve never wraps the `ResponseWriter`, so `Flusher`, `Hijacker` and `http.ResponseController`
+behave as on a plain `http.Server`. That matters for apps with long responses:
+
+- **Streaming (SSE, model output) and large transfers:** set `WriteTimeout: -1` (and
+  `ReadTimeout: -1` for uploads). Bulle and Nuage do this today. An expired write deadline cuts
+  a response after the header promised a `Content-Length`, and over HTTP/2 resets the stream
+  with `INTERNAL_ERROR`.
+- **A few long routes on an otherwise short budget** (Courrier's assist, Echo's summary and
+  recordings): keep the default and mount `WriteBudget(d)` on those routes, or call
+  `http.NewResponseController(w).SetWriteDeadline` in the handler. `WriteBudget(0)` removes the
+  deadline for the route.
+- **A stream that must outlive `ReadTimeout`** (Courrier's push stream) clears it in the handler
+  with `rc.SetReadDeadline(time.Time{})`, as it does today.
+
 ## `health`
 
 ```go
@@ -391,6 +469,7 @@ func DB(db *sql.DB) Check
 func Live() http.HandlerFunc
 func Ready(checks ...Check) http.HandlerFunc
 func Mount(router chi.Router, checks ...Check)
+func Version(version string) http.HandlerFunc
 ```
 
 | Route | Body | Status |
@@ -402,6 +481,10 @@ func Mount(router chi.Router, checks ...Check)
 first error. `DB` returns a `Check` that calls `db.PingContext`. `Mount` registers all four
 routes — the `/api` copies exist because the public edge forwards only `/api/*` on some
 deployments.
+
+`Version` answers `{"version": "<release>"}` with `Cache-Control: no-store`. The app keeps
+`var version = "dev"` in package main for the linker (`-ldflags "-X main.version=v1.2.3"`) and
+mounts `router.Get("/version", health.Version(version))`.
 
 ## `healthcheck`
 
@@ -802,6 +885,54 @@ privately, every tool's prefix, title, hints and object schemas, the 403 `insuff
 challenge on a write tool with a read-only token, and for each `ConfirmCase`: a link and no run
 without elicitation and for a 2025-11-25 client, no run on decline, exactly one run on accept,
 no second run on replay, and no run for a link id passed off as a signed state.
+
+## `netguard`
+
+Stdlib only. Refuses URLs, names and connections that reach an internal network, for every
+server-side fetch of an address someone else supplied (webhook targets, avatars, metadata
+documents, link previews, uptime probes).
+
+```go
+func IsInternal(addr netip.Addr) bool
+func CheckURL(raw string) (*url.URL, error)
+func CheckHost(host string) error
+func Control(network, address string, c syscall.RawConn) error
+
+type Guard struct {
+	Resolver Resolver  // nil means net.DefaultResolver
+	Dial     func(ctx context.Context, network, address string) (net.Conn, error) // tests only
+	TLS      *tls.Config // tests only
+}
+
+func (g *Guard) Resolve(ctx context.Context, host string) (netip.Addr, error)
+func (g *Guard) DialContext(ctx context.Context, network, address string) (net.Conn, error)
+func (g *Guard) Transport() *http.Transport
+func (g *Guard) Client(timeout time.Duration) *http.Client          // follows no redirect
+func (g *Guard) ClientFollowing(timeout time.Duration) *http.Client // re-checks up to 10 hops
+
+type BlockedError struct{ Code, Reason string }
+func AsBlocked(err error) (*BlockedError, bool)
+```
+
+Codes: `blocked_url` (bad scheme, credentials, internal or single-label name, non-canonical IP
+form), `blocked_internal` (the address is internal), `blocked_unresolved` (no address to check).
+A refusal never carries the resolved address.
+
+Three layers, because each one alone fails. `CheckURL` rejects a bad value when the user saves it.
+`Guard.Resolve` refuses a name when ANY answer is internal. `Control` runs inside the dialer on
+the final address, so DNS rebinding, redirects and IPv4-in-IPv6 forms cannot get past it;
+`Guard.DialContext` also connects to the address it checked instead of resolving again. A
+pre-resolve check alone is not a guard.
+
+`IsInternal` blocks loopback, RFC 1918, link-local, CGNAT (100.64.0.0/10, which holds Alibaba's
+metadata address), IPv6 unique-local (which holds AWS's `fd00:ec2::254`), multicast, `0.0.0.0/8`,
+reserved and documentation ranges, benchmarking, 6to4 relay, site-local, SRv6 `5f00::/16`, and the
+Azure wireserver `168.63.129.16`. IPv4-mapped, NAT64 (`64:ff9b::/96`) and 6to4 (`2002::/16`)
+addresses are judged by the IPv4 address they embed, so an IPv6-only host still reaches public
+IPv4 but `64:ff9b::a9fe:a9fe` stays blocked.
+
+There is no allow-list for private targets. An app that must probe its own LAN (a self-hosted
+uptime monitor) decides that per target before it builds the client, and says so in its docs.
 
 ## `joblock`
 
