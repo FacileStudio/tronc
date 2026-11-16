@@ -738,7 +738,7 @@ An app that shows a Bulle button (Agenda's "Plan my week", a free-text ask) also
 `StartRun(ctx, app, StartRunRequest{SpaceID, Title, Prompt, Page})` and `Profile(ctx)`.
 `StartRun` posts `{app, space_id?, title?, prompt, page?}` to Bulle's `POST /api/runs` and returns
 `RunStart{RunID, SessionID}`; the token must be exchanged for audience `bulle` with scope
-`bulle.write`, and `app` must be the app the token acts for. The prompt is the user's own message,
+`bulle.write`, and `app` is a suite app label (the token's `act` is the calling client id, not a name). The prompt is the user's own message,
 typed or a fixed template of the app, never text from a third party: Bulle runs it as the owner's
 message with the normal approval gate. It is capped at 2000 characters, at 30 runs an hour per
 user and app. `Profile` reads `GET /api/assistant/profile` (scope `bulle.read`) as

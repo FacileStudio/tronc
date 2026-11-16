@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// StartRun starts a background run for app, the app the token acts for, from
+// StartRun starts a background run for app, a suite app label such as agenda, from
 // the user's own prompt. Bulle caps it at 30 runs an hour per user and app,
 // answers 429 past that and 402 without AI access. Follow the run with
 // RunStatus and answer its approvals with Decide.
