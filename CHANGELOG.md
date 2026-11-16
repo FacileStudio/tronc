@@ -6,6 +6,8 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-16
+
 ### Added
 
 - **`bulle.Client.StartRun` and `Client.Profile`.** `StartRun(ctx, app, StartRunRequest{SpaceID, Title, Prompt, Page})` calls Bulle's `POST /api/runs`: a run from the app's own UI for the signed-in user, with the user's own prompt (typed or a fixed template), not an idea. `Profile(ctx)` calls `GET /api/assistant/profile` and returns the assistant's `Name` and `AvatarURL` (an http(s) link or an inline image), free of AI access. `RunStart.IdeaID` is now omitted when empty.
