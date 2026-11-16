@@ -699,7 +699,15 @@ practice (audience `bulle`, scopes `bulle.read` and `bulle.write`).
 - `DecideAI(ctx, DecideRequest{State, Questions})` calls `POST /api/ai/decide` as the user, like
   `Complete`, and returns `Decision{Answers, Model, Usage}`. The deprecated `ActingFor` field runs
   as the app's service instead: the `TokenSource` returns the service key and `ActingFor` is the
-  user's email, sent as `X-Bulle-Acting-For`.
+  user's email, sent as `X-Bulle-Acting-For`. `DecideRequest.Judges` is optional: empty or
+  `{JudgeJev}` asks Jev alone and the answer is unchanged; `{JudgeJev, JudgeClef}` asks both at once.
+  Each `Answer` then carries `Judges` (`JudgeAnswer{Choice, Confidence, Probabilities, Error}` per
+  judge) and `Agree`, read with `Answer.Agreed()`. `Choice` is set only when the judges agree and
+  `Confidence` is the lower of the two. `Decision.Judges` gives each judge's `JudgeCall{Model,
+  Usage, Error}`, where `Error` is `"not configured"` or `"did not answer"`: a failed judge is
+  named, never replaced by the other, and the call still answers 200. A two-judge call counts as
+  two against Bulle's rate limit and the user's AI budget. Floors are per judge, so calibrate one
+  on the pair, and keep the state short: clef reads only the start of a long text state.
 - `Summarize(ctx, SummarizeRequest{Query, Sources})` calls `POST /api/ai/summarize` as the user with
   1 to 10 `SummarySource{Title, URL, Snippet}` and a query of up to 500 bytes. It returns
   `Summary{Summary, Citations, Model}`.

@@ -55,21 +55,60 @@ type Question struct {
 	Options      []string `json:"options,omitempty"`
 }
 
+// The judges a Decide call may ask. A call asks Jev alone unless Judges
+// names both.
+const (
+	JudgeJev  = "jev"
+	JudgeClef = "clef"
+)
+
 // DecideRequest asks Questions about State for the user the client's
-// TokenSource speaks for.
+// TokenSource speaks for. Judges is optional: empty or {JudgeJev} asks Jev
+// alone, and {JudgeJev, JudgeClef} asks both at once. The response then holds
+// each judge's answer and whether they agree. A two-judge call counts as two
+// against Bulle's rate limit and the user's AI budget.
 type DecideRequest struct {
 	// Deprecated: leave ActingFor empty and call with the user's exchanged
 	// token. Set, it names the user a service-key call acts for.
 	ActingFor string              `json:"-"`
 	State     any                 `json:"state"`
 	Questions map[string]Question `json:"questions"`
+	Judges    []string            `json:"judges,omitempty"`
 }
 
-// Answer is one choice question's result.
+// Answer is one choice question's result. With two judges, Judges holds each
+// judge's own answer and Agree says whether they picked the same option;
+// Choice is then set only when they agree, Confidence is the lower of the two
+// (0 when a judge gave no answer) and Probabilities is empty. A single-judge
+// answer carries neither Agree nor Judges.
 type Answer struct {
+	Choice        string                 `json:"choice"`
+	Confidence    float64                `json:"confidence"`
+	Probabilities map[string]float64     `json:"probabilities"`
+	Agree         *bool                  `json:"agree,omitempty"`
+	Judges        map[string]JudgeAnswer `json:"judges,omitempty"`
+}
+
+// Agreed reports whether a two-judge answer found both judges on the same
+// option. It is false for a single-judge answer and when a judge failed.
+func (a Answer) Agreed() bool { return a.Agree != nil && *a.Agree }
+
+// JudgeAnswer is what one judge answered to one question, or why it did not:
+// Error is "not configured" or "did not answer".
+type JudgeAnswer struct {
 	Choice        string             `json:"choice"`
 	Confidence    float64            `json:"confidence"`
-	Probabilities map[string]float64 `json:"probabilities"`
+	Probabilities map[string]float64 `json:"probabilities,omitempty"`
+	Error         string             `json:"error,omitempty"`
+}
+
+// JudgeCall is what one judge's call served and billed, or why it failed:
+// Error is "not configured" for a judge the server holds no key for, and
+// "did not answer" for one whose call failed.
+type JudgeCall struct {
+	Model string `json:"model,omitempty"`
+	Usage Usage  `json:"usage"`
+	Error string `json:"error,omitempty"`
 }
 
 // Usage is what one DecideAI call billed.
@@ -80,11 +119,13 @@ type Usage struct {
 }
 
 // Decision is every answer, keyed by its question's name, the model that
-// served them and the usage.
+// served them and the usage. With two judges, Model is Jev's, Usage is the sum
+// of both calls and Judges holds each call on its own.
 type Decision struct {
-	Answers map[string]Answer `json:"answers"`
-	Model   string            `json:"model"`
-	Usage   Usage             `json:"usage"`
+	Answers map[string]Answer    `json:"answers"`
+	Model   string               `json:"model"`
+	Usage   Usage                `json:"usage"`
+	Judges  map[string]JudgeCall `json:"judges,omitempty"`
 }
 
 // DecideAI asks Bulle's POST /api/ai/decide as the user the TokenSource

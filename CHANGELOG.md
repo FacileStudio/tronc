@@ -6,6 +6,10 @@ while on `v0`, a breaking change bumps the minor.
 
 ## [Unreleased]
 
+### Added
+
+- **`bulle.DecideRequest.Judges`.** `{JudgeJev, JudgeClef}` asks Bulle's `POST /api/ai/decide` to put the questions to both judges. `Answer` gains `Agree` (read it with `Answer.Agreed()`) and `Judges`, and `Decision` gains `Judges`, with each judge's own answer or its `Error` (`not configured` or `did not answer`). `Choice` is set only when the judges agree, and `Confidence` is the lower of the two. Without `Judges` the request and the decoded answer are unchanged.
+
 ## [0.27.0] - 2026-11-16
 
 ### Added
