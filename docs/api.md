@@ -733,6 +733,28 @@ mounts, on the router the app's API lives on:
 Mount it behind the app's authentication middleware. A Bulle 401 is about the app's token, so the
 frontend gets 503, never 401. A token source error that is a tronc `*errors.Error` (porte's
 `ErrReconnect` is a 412) is passed through as it is.
+
+An app that shows a Bulle button (Agenda's "Plan my week", a free-text ask) also calls
+`StartRun(ctx, app, StartRunRequest{SpaceID, Title, Prompt, Page})` and `Profile(ctx)`.
+`StartRun` posts `{app, space_id?, title?, prompt, page?}` to Bulle's `POST /api/runs` and returns
+`RunStart{RunID, SessionID}`; the token must be exchanged for audience `bulle` with scope
+`bulle.write`, and `app` must be the app the token acts for. The prompt is the user's own message,
+typed or a fixed template of the app, never text from a third party: Bulle runs it as the owner's
+message with the normal approval gate. It is capped at 2000 characters, at 30 runs an hour per
+user and app. `Profile` reads `GET /api/assistant/profile` (scope `bulle.read`) as
+`Profile{Name, AvatarURL}`, empty until the user sets them, and needs no AI access.
+
+`MountBulle(router, Options{...})` takes the same `Options` and mounts, beside `MountIdeas`:
+
+| Route | Does |
+|---|---|
+| `GET /bulle/profile` | `{name, avatar_url}`; free |
+| `POST /bulle/runs` | `{title?, prompt, page?}`, answers 202 `{run_id, session_id}`; 402 without AI access without calling Bulle |
+| `GET /bulle/runs/{run}` | the run |
+| `POST /bulle/runs/{run}/approvals/{call}` | `{"approve": bool}`, 204; approving needs AI access |
+
+The app and the space come from `Options.App` and `Options.Space`; a body that names `app` or
+anything else unknown is a 400.
 ## `mcp`
 
 A remote MCP server for one app: go-sdk v1.8.0, streamable HTTP, stateless (spec 2026-07-28).
