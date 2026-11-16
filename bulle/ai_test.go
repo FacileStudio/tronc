@@ -2,8 +2,10 @@ package bulle_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/FacileStudio/tronc/bulle"
@@ -137,5 +139,76 @@ func TestRedirectsAreRefused(t *testing.T) {
 	}
 	if shared.CheckRedirect != nil {
 		t.Fatal("the caller's client must not be changed")
+	}
+}
+
+func TestDecideAIAsksTwoJudgesAndReadsEachAnswer(t *testing.T) {
+	f := newFakeBulle(t, fixed(200, `{"answers":{"project":{"choice":"a","confidence":0.6,"probabilities":{},"agree":true,"judges":{`+
+		`"jev":{"choice":"a","confidence":0.9,"probabilities":{"a":0.9,"b":0.1}},"clef":{"choice":"a","confidence":0.6}}},`+
+		`"size":{"choice":"","confidence":0,"probabilities":{},"agree":false,"judges":{"jev":{"choice":"s","confidence":0.8},"clef":{"choice":"","confidence":0,"error":"did not answer"}}}},`+
+		`"model":"jev-1","usage":{"input_tokens":8,"output_tokens":0,"cost":0.002},`+
+		`"judges":{"jev":{"model":"jev-1","usage":{"input_tokens":4,"output_tokens":0,"cost":0.001}},"clef":{"error":"did not answer","usage":{"input_tokens":0,"output_tokens":0}}}}`))
+	decision, err := newClient(t, f).DecideAI(context.Background(), bulle.DecideRequest{
+		State:     map[string]string{"title": "x"},
+		Questions: map[string]bulle.Question{"project": {Type: "choice", Instructions: "Pick", Options: []string{"a", "b"}}},
+		Judges:    []string{bulle.JudgeJev, bulle.JudgeClef},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"state":{"title":"x"},"questions":{"project":{"type":"choice","instructions":"Pick","options":["a","b"]}},"judges":["jev","clef"]}`
+	if body := f.seen().Body; body != want {
+		t.Fatalf("body = %s", body)
+	}
+	project, size := decision.Answers["project"], decision.Answers["size"]
+	if !project.Agreed() || project.Choice != "a" || project.Confidence != 0.6 || project.Judges[bulle.JudgeJev].Confidence != 0.9 || project.Judges[bulle.JudgeClef].Choice != "a" {
+		t.Fatalf("project = %+v", project)
+	}
+	if size.Agreed() || size.Choice != "" || size.Judges[bulle.JudgeClef].Error != "did not answer" || size.Judges[bulle.JudgeJev].Choice != "s" {
+		t.Fatalf("size = %+v", size)
+	}
+	if decision.Judges[bulle.JudgeClef].Error != "did not answer" || decision.Judges[bulle.JudgeJev].Model != "jev-1" || decision.Usage.Cost != 0.002 {
+		t.Fatalf("judges = %+v usage = %+v", decision.Judges, decision.Usage)
+	}
+}
+
+func TestDecideAISingleJudgeAnswerHasNoJudgeFields(t *testing.T) {
+	f := newFakeBulle(t, fixed(200, `{"answers":{"project":{"choice":"a","confidence":0.9,"probabilities":{"a":0.9}}},"model":"jev","usage":{"input_tokens":3,"output_tokens":1}}`))
+	decision, err := newClient(t, f).DecideAI(context.Background(), bulle.DecideRequest{
+		State:     "x",
+		Questions: map[string]bulle.Question{"project": {Type: "choice", Instructions: "Pick", Options: []string{"a", "b"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body := f.seen().Body; strings.Contains(body, "judges") {
+		t.Fatalf("a single-judge request must not carry judges: %s", body)
+	}
+	answer := decision.Answers["project"]
+	if answer.Agreed() || answer.Agree != nil || answer.Judges != nil || decision.Judges != nil || answer.Choice != "a" {
+		t.Fatalf("decision = %+v", decision)
+	}
+	encoded, _ := json.Marshal(decision)
+	if strings.Contains(string(encoded), "judges") || strings.Contains(string(encoded), "agree") {
+		t.Fatalf("a single-judge decision re-encodes with judge fields: %s", encoded)
+	}
+}
+
+func TestAnOlderDecisionShapeStillReadsATwoJudgeAnswer(t *testing.T) {
+	f := newFakeBulle(t, fixed(200, `{"answers":{"project":{"choice":"a","confidence":0.6,"probabilities":{},"agree":true,"judges":{"jev":{"choice":"a","confidence":0.9}}}},`+
+		`"model":"jev-1","usage":{"input_tokens":8,"output_tokens":0},"judges":{"jev":{"model":"jev-1","usage":{"input_tokens":4,"output_tokens":0}}}}`))
+	type legacyAnswer struct {
+		Choice        string             `json:"choice"`
+		Confidence    float64            `json:"confidence"`
+		Probabilities map[string]float64 `json:"probabilities"`
+	}
+	var legacy struct {
+		Answers map[string]legacyAnswer `json:"answers"`
+		Model   string                  `json:"model"`
+		Usage   bulle.Usage             `json:"usage"`
+	}
+	err := newClient(t, f).Call(context.Background(), bulle.Request{Method: http.MethodPost, Segments: []string{"ai", "decide"}, Body: map[string]any{}}, &legacy)
+	if err != nil || legacy.Answers["project"].Choice != "a" || legacy.Model != "jev-1" || legacy.Usage.InputTokens != 8 {
+		t.Fatalf("legacy = %+v err = %v", legacy, err)
 	}
 }
