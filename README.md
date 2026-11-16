@@ -141,7 +141,7 @@ healthcheck/  an argv hook so a distroless container can probe itself
 spa/          serves a built single-page client from the same binary
 env/          the shared configuration plus typed variable helpers
 apiref/       the route registry, its OpenAPI 3.1 rendering, and the Scalar page
-bulle/        a client for Bulle's Ideas API, and MountIdeas for the app's own /api/ideas routes
+bulle/        a client for Bulle's Ideas API, StartRun and Profile, and MountIdeas and MountBulle for the app's own /api/ideas and /api/bulle routes
 mcp/          the remote MCP server kit: Mount, tools, confirmations; mcptest/ checks it
 joblock/      one replica runs a background job: Postgres advisory lock held on a dedicated connection
 conformance/  JSON test vectors built from the packages above, for ports such as tronc-rs
